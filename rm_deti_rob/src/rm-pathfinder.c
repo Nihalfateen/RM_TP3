@@ -16,10 +16,10 @@
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_CONFIRM_TICKS 8
 #define TARGET_CONFIRM_MIN_HITS 6
-#define TARGET_MIN_BLACK_SENSORS 3
+#define TARGET_MIN_BLACK_SENSORS 4
 #define TARGET_SCAN_SPEED 15
 #define TARGET_READY_TICKS 5
-#define CODE_VERSION "target-stable-v4"
+#define CODE_VERSION "target-stable-v5"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
