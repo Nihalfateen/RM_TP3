@@ -10,6 +10,10 @@
 #define INTERSECTION_APPROACH_TICKS 6
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 45
+#define RIGHT_TURN_MIN_TICKS 8
+#define RIGHT_TURN_MAX_TICKS 45
+#define TURN_AROUND_MIN_TICKS 18
+#define TURN_AROUND_MAX_TICKS 75
 #define TARGET_CONFIRM_TICKS 8
 #define TARGET_CONFIRM_MIN_HITS 5
 #define TARGET_MIN_BLACK_SENSORS 4
@@ -38,11 +42,42 @@ static char pathMemory[PATH_MAX_MOVES + 1];
 static unsigned int pathLength = 0;
 static int pathOverflow = 0;
 
+static char optimizedPath[PATH_MAX_MOVES + 1];
+static unsigned int optimizedPathLength = 0;
+static int optimizedPathOverflow = 0;
+
+static char returnPath[PATH_MAX_MOVES + 1];
+static unsigned int returnPathLength = 0;
+static int returnPathOverflow = 0;
+
+typedef enum
+{
+    MODE_IDLE,
+    MODE_EXPLORE,
+    MODE_TARGET_FOUND,
+    MODE_RETURN,
+    MODE_FINISHED
+} RobotMode;
+
 static void resetPath(void)
 {
     pathLength = 0;
     pathOverflow = 0;
     pathMemory[0] = '\0';
+}
+
+static void resetOptimizedPath(void)
+{
+    optimizedPathLength = 0;
+    optimizedPathOverflow = 0;
+    optimizedPath[0] = '\0';
+}
+
+static void resetReturnPath(void)
+{
+    returnPathLength = 0;
+    returnPathOverflow = 0;
+    returnPath[0] = '\0';
 }
 
 static void recordMove(char move)
@@ -58,6 +93,136 @@ static void recordMove(char move)
     pathMemory[pathLength] = '\0';
 }
 
+static int moveToAngle(char move)
+{
+    if(move == 'L')
+        return 270;
+    if(move == 'S')
+        return 0;
+    if(move == 'R')
+        return 90;
+    if(move == 'B')
+        return 180;
+
+    return -1;
+}
+
+static char angleToMove(int angle)
+{
+    angle %= 360;
+
+    if(angle < 0)
+        angle += 360;
+
+    if(angle == 0)
+        return 'S';
+    if(angle == 90)
+        return 'R';
+    if(angle == 180)
+        return 'B';
+    if(angle == 270)
+        return 'L';
+
+    return '\0';
+}
+
+static void simplifyOptimizedPathEnd(void)
+{
+    int firstAngle;
+    int secondAngle;
+    int thirdAngle;
+    char replacement;
+
+    if(optimizedPathLength < 3)
+        return;
+
+    if(optimizedPath[optimizedPathLength - 2] != 'B')
+        return;
+
+    firstAngle = moveToAngle(optimizedPath[optimizedPathLength - 3]);
+    secondAngle = moveToAngle(optimizedPath[optimizedPathLength - 2]);
+    thirdAngle = moveToAngle(optimizedPath[optimizedPathLength - 1]);
+
+    if(firstAngle < 0 || secondAngle < 0 || thirdAngle < 0)
+        return;
+
+    replacement = angleToMove(firstAngle + secondAngle + thirdAngle);
+    if(replacement == '\0')
+        return;
+
+    optimizedPathLength -= 3;
+    optimizedPath[optimizedPathLength] = replacement;
+    optimizedPathLength++;
+    optimizedPath[optimizedPathLength] = '\0';
+}
+
+static void appendOptimizedMove(char move)
+{
+    if(moveToAngle(move) < 0)
+        return;
+
+    if(optimizedPathLength >= PATH_MAX_MOVES)
+    {
+        optimizedPathOverflow = 1;
+        return;
+    }
+
+    optimizedPath[optimizedPathLength] = move;
+    optimizedPathLength++;
+    optimizedPath[optimizedPathLength] = '\0';
+
+    simplifyOptimizedPathEnd();
+}
+
+static void optimizePath(void)
+{
+    unsigned int i;
+
+    resetOptimizedPath();
+
+    for(i = 0; i < pathLength; i++)
+        appendOptimizedMove(pathMemory[i]);
+}
+
+static char invertMove(char move)
+{
+    if(move == 'L')
+        return 'R';
+    if(move == 'R')
+        return 'L';
+    if(move == 'S')
+        return 'S';
+    if(move == 'B')
+        return 'B';
+
+    return '\0';
+}
+
+static void buildReturnPath(void)
+{
+    int i;
+    char move;
+
+    resetReturnPath();
+
+    for(i = (int)optimizedPathLength - 1; i >= 0; i--)
+    {
+        move = invertMove(optimizedPath[i]);
+        if(move == '\0')
+            continue;
+
+        if(returnPathLength >= PATH_MAX_MOVES)
+        {
+            returnPathOverflow = 1;
+            break;
+        }
+
+        returnPath[returnPathLength] = move;
+        returnPathLength++;
+        returnPath[returnPathLength] = '\0';
+    }
+}
+
 static void printPath(void)
 {
     unsigned int i;
@@ -70,6 +235,40 @@ static void printPath(void)
         printf("%c", pathMemory[i]);
 
     if(pathOverflow)
+        printf(" [overflow]");
+
+    printf("\n");
+}
+
+static void printOptimizedPath(void)
+{
+    unsigned int i;
+
+    printf("Optimized path (");
+    printInt(optimizedPathLength, 10);
+    printf(" moves): ");
+
+    for(i = 0; i < optimizedPathLength; i++)
+        printf("%c", optimizedPath[i]);
+
+    if(optimizedPathOverflow)
+        printf(" [overflow]");
+
+    printf("\n");
+}
+
+static void printReturnPath(void)
+{
+    unsigned int i;
+
+    printf("Return path (");
+    printInt(returnPathLength, 10);
+    printf(" moves): ");
+
+    for(i = 0; i < returnPathLength; i++)
+        printf("%c", returnPath[i]);
+
+    if(returnPathOverflow)
         printf(" [overflow]");
 
     printf("\n");
@@ -182,6 +381,22 @@ static int hasLeftIntersection(unsigned int sensors)
         && (hasForwardPath(sensors) || hasRightPath(sensors));
 }
 
+static int hasReturnIntersection(unsigned int sensors)
+{
+    int branches = 0;
+
+    sensors &= SENSOR_MASK;
+
+    if(hasLeftPath(sensors))
+        branches++;
+    if(hasForwardPath(sensors))
+        branches++;
+    if(hasRightPath(sensors))
+        branches++;
+
+    return branches >= 2;
+}
+
 static int activeSensorCount(unsigned int sensors)
 {
     int count = 0;
@@ -274,11 +489,123 @@ static void turnLeftToLine(void)
     }
 }
 
+static void turnRightToLine(void)
+{
+    int ticks = 0;
+    unsigned int sensors = 0;
+
+    setVel2(TURN_SPEED, -TURN_SPEED);
+
+    while(!stopButton() && ticks < RIGHT_TURN_MAX_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+        ticks++;
+
+        if(ticks >= RIGHT_TURN_MIN_TICKS
+            && (sensors & SENSOR_CENTER)
+            && !hasReturnIntersection(sensors))
+        {
+            break;
+        }
+    }
+}
+
+static void turnAroundToLine(void)
+{
+    int ticks = 0;
+    unsigned int sensors = 0;
+
+    setVel2(TURN_SPEED, -TURN_SPEED);
+
+    while(!stopButton() && ticks < TURN_AROUND_MAX_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+        ticks++;
+
+        if(ticks >= TURN_AROUND_MIN_TICKS
+            && (sensors & SENSOR_CENTER)
+            && !hasReturnIntersection(sensors))
+        {
+            break;
+        }
+    }
+}
+
 static void chooseLeftAtIntersection(void)
 {
     driveForwardTicks(INTERSECTION_APPROACH_TICKS);
     if(!stopButton())
         turnLeftToLine();
+}
+
+static void executeReturnMove(char move)
+{
+    printf("Return move: %c\n", move);
+
+    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
+    if(stopButton())
+        return;
+
+    if(move == 'L')
+        turnLeftToLine();
+    else if(move == 'R')
+        turnRightToLine();
+    else if(move == 'B')
+        turnAroundToLine();
+    else if(move == 'S')
+        driveForwardTicks(INTERSECTION_APPROACH_TICKS);
+    else
+        printf("Unsupported return move ignored: %c\n", move);
+}
+
+static int runReturnNavigation(void)
+{
+    unsigned int sensors;
+    unsigned int returnIndex = 0;
+    int lastDirection = 1;
+    int intersectionArmed = 1;
+    int completed = 0;
+
+    leds(LED_EXPLORING | LED_TARGET_FOUND);
+    printf("Return navigation starting\n");
+
+    turnAroundToLine();
+    intersectionArmed = 0;
+
+    while(!stopButton())
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0);
+
+        if(returnIndex >= returnPathLength)
+        {
+            setVel2(0, 0);
+            printf("Return path complete; temporary stop at presumed start\n");
+            completed = 1;
+            break;
+        }
+
+        if(intersectionArmed && hasReturnIntersection(sensors))
+        {
+            leds(LED_INTERSECTION);
+            executeReturnMove(returnPath[returnIndex]);
+            returnIndex++;
+            intersectionArmed = 0;
+            leds(LED_EXPLORING | LED_TARGET_FOUND);
+        }
+        else
+        {
+            followLine(sensors, &lastDirection);
+
+            if(!hasReturnIntersection(sensors))
+                intersectionArmed = 1;
+        }
+    }
+
+    setVel2(0, 0);
+    return completed;
 }
 
 int main(void)
@@ -287,6 +614,7 @@ int main(void)
     int lastDirection = 1;
     int intersectionArmed = 1;
     int targetFound = 0;
+    RobotMode mode = MODE_IDLE;
 
     initPIC32();
     closedLoopControl(true);
@@ -300,11 +628,14 @@ int main(void)
         printf("Press start to run\n");
         while(!startButton());
 
+        mode = MODE_EXPLORE;
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
         targetFound = 0;
         resetPath();
+        resetOptimizedPath();
+        resetReturnPath();
 
         while(!stopButton())
         {
@@ -318,11 +649,16 @@ int main(void)
                     setVel2(0, 0);
                     leds(LED_TARGET_FOUND);
                     targetFound = 1;
+                    mode = MODE_TARGET_FOUND;
 
                     printf("Target confirmed sensors=");
                     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                     printf("\n");
                     printPath();
+                    optimizePath();
+                    printOptimizedPath();
+                    buildReturnPath();
+                    printReturnPath();
                     break;
                 }
 
@@ -352,14 +688,25 @@ int main(void)
 
         setVel2(0, 0);
 
-        if(targetFound)
+        if(targetFound && mode == MODE_TARGET_FOUND)
         {
-            leds(LED_TARGET_FOUND);
-            printf("Exploration stopped at target; return phase pending\n");
+            mode = MODE_RETURN;
+            if(runReturnNavigation())
+            {
+                mode = MODE_FINISHED;
+                leds(LED_TARGET_FOUND);
+                printf("Finished; press stop to reset\n");
+            }
+            else
+            {
+                printf("Return interrupted by stop button\n");
+            }
+
             while(!stopButton())
                 waitTick20ms();
         }
 
+        mode = MODE_IDLE;
         leds(0x00);
 
         while(stopButton());

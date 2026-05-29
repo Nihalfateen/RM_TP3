@@ -314,18 +314,23 @@ Possible patterns:
 4. Implement intersection detection and left-first decisions. Completed.
 5. Implement target detection. Completed.
 6. Implement path recording. Completed.
-7. Implement path optimization. Next.
-8. Implement return navigation.
-9. Tune speeds and thresholds on the real robot.
-10. Prepare report, presentation, and demo.
+7. Implement path optimization. Completed.
+8. Implement return navigation. Completed.
+9. Implement start-position detection and final stopping behavior. Next.
+10. Tune speeds and thresholds on the real robot.
+11. Prepare report, presentation, and demo.
 
 ## 17. Current Project Status
 
 - Milestone 1 is completed: the robot follows the black line using `readLineSensors(0)` and `setVel2(leftSpeed, rightSpeed)`.
 - Milestone 2 is completed: the robot detects left intersections with separated path checks and chooses the left branch during exploration.
-- Milestone 3 is completed: the robot detects the final target marker, stops exploration, turns on a distinct LED pattern, and waits for the stop button. Return behavior is not implemented yet.
+- Milestone 3 is completed: the robot detects the final target marker, stops exploration, turns on a distinct LED pattern, and switches toward return behavior after path processing.
 - Milestone 4 is completed: exploration decisions are now recorded in a compact fixed-size path buffer. The current implementation records `L` whenever the robot chooses a left branch at an intersection, prevents path buffer overflow, and prints the recorded path when the target is confirmed.
+- Milestone 5 is completed: the robot now builds a separate optimized path buffer from the recorded exploration path after the target is confirmed. The optimizer uses fixed-size memory, rejects unsupported move symbols, prevents optimized-buffer overflow, and simplifies common dead-end patterns that contain `B`, such as `L B L` to `S`, `L B S` to `R`, `S B S` to `B`, and related turn combinations. When the target is confirmed, the program prints both the raw recorded path and the optimized path.
+- Milestone 6 is completed: after target confirmation, the robot builds a fixed-size return path from the optimized exploration path, turns around, follows the line in return mode, and executes one return move at each detected intersection. The return path is constructed by reading the optimized path backwards and inverting each move: `L` becomes `R`, `R` becomes `L`, while `S` and `B` remain unchanged. The implementation prints the return path and each executed return move, keeps stop-button checks active during forward approach and turn loops, and prevents return-path buffer overflow.
 
 Target detection uses a stable wide-line pattern instead of a single sensor sample. A candidate target is detected when at least four of the five ground sensors see black, or when the reading covers the left side, center, and right side at the same time. Because the robot may pass over a thick target marker too quickly at normal line-following speed, the current implementation slows down to `TARGET_SCAN_SPEED` and performs a short confirmation scan for `TARGET_CONFIRM_TICKS`. The target is confirmed only if the wide-line candidate appears at least `TARGET_CONFIRM_MIN_HITS` times during that scan. If the scan does not collect enough hits, the candidate is rejected and normal exploration continues.
 
-Next milestone: implement shortest-path simplification / path optimization using the recorded exploration decisions. Return navigation is still pending and has not been implemented yet.
+Return navigation currently uses a temporary final condition: after all return-path moves have been executed, the robot stops at the presumed start. This allows physical return testing before a reliable start-marker or start-position detector is available.
+
+Next milestone: implement start-position detection and final stopping behavior so the robot can confirm the actual start location before entering the finished state.
