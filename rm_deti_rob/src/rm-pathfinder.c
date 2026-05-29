@@ -15,11 +15,11 @@
 #define TURN_AROUND_MIN_TICKS 18
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_CONFIRM_TICKS 8
-#define TARGET_CONFIRM_MIN_HITS 5
-#define TARGET_MIN_BLACK_SENSORS 5
+#define TARGET_CONFIRM_MIN_HITS 6
+#define TARGET_MIN_BLACK_SENSORS 3
 #define TARGET_SCAN_SPEED 15
 #define TARGET_READY_TICKS 5
-#define CODE_VERSION "target-strict-v3"
+#define CODE_VERSION "target-stable-v4"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -439,7 +439,24 @@ static int isTargetCandidate(unsigned int sensors)
     sensors &= SENSOR_MASK;
 
     return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
-        && ((sensors & SENSOR_MASK) == SENSOR_MASK);
+        && hasForwardPath(sensors)
+        && (sensors & (SENSOR_LEFT_1 | SENSOR_LEFT_2))
+        && (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2));
+}
+
+static int isSimilarTargetReading(unsigned int firstSensors, unsigned int sensors)
+{
+    unsigned int firstCore;
+    unsigned int currentCore;
+
+    firstSensors &= SENSOR_MASK;
+    sensors &= SENSOR_MASK;
+
+    firstCore = firstSensors & (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
+    currentCore = sensors & (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
+
+    return isTargetCandidate(sensors)
+        && currentCore == firstCore;
 }
 
 static int confirmTarget(unsigned int firstSensors)
@@ -458,7 +475,7 @@ static int confirmTarget(unsigned int firstSensors)
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
 
-        if(isTargetCandidate(sensors))
+        if(isSimilarTargetReading(firstSensors, sensors))
             hits++;
     }
 
