@@ -313,8 +313,8 @@ Possible patterns:
 3. Implement basic line following. Completed.
 4. Implement intersection detection and left-first decisions. Completed.
 5. Implement target detection. Completed.
-6. Implement path recording. Next.
-7. Implement path optimization.
+6. Implement path recording. Completed.
+7. Implement path optimization. Next.
 8. Implement return navigation.
 9. Tune speeds and thresholds on the real robot.
 10. Prepare report, presentation, and demo.
@@ -324,7 +324,8 @@ Possible patterns:
 - Milestone 1 is completed: the robot follows the black line using `readLineSensors(0)` and `setVel2(leftSpeed, rightSpeed)`.
 - Milestone 2 is completed: the robot detects left intersections with separated path checks and chooses the left branch during exploration.
 - Milestone 3 is completed: the robot detects the final target marker, stops exploration, turns on a distinct LED pattern, and waits for the stop button. Return behavior is not implemented yet.
+- Milestone 4 is completed: exploration decisions are now recorded in a compact fixed-size path buffer. The current implementation records `L` whenever the robot chooses a left branch at an intersection, prevents path buffer overflow, and prints the recorded path when the target is confirmed.
 
 Target detection uses a stable wide-line pattern instead of a single sensor sample. A candidate target is detected when at least four of the five ground sensors see black, or when the reading covers the left side, center, and right side at the same time. Because the robot may pass over a thick target marker too quickly at normal line-following speed, the current implementation slows down to `TARGET_SCAN_SPEED` and performs a short confirmation scan for `TARGET_CONFIRM_TICKS`. The target is confirmed only if the wide-line candidate appears at least `TARGET_CONFIRM_MIN_HITS` times during that scan. If the scan does not collect enough hits, the candidate is rejected and normal exploration continues.
 
-Next milestone: add path recording during exploration so each relevant decision can be stored for later shortest-path return.
+Next milestone: implement shortest-path simplification / path optimization using the recorded exploration decisions. Return navigation is still pending and has not been implemented yet.

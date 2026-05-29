@@ -32,6 +32,49 @@
 #define LED_INTERSECTION 0x03
 #define LED_TARGET_FOUND 0x0F
 
+#define PATH_MAX_MOVES 64
+
+static char pathMemory[PATH_MAX_MOVES + 1];
+static unsigned int pathLength = 0;
+static int pathOverflow = 0;
+
+static void resetPath(void)
+{
+    pathLength = 0;
+    pathOverflow = 0;
+    pathMemory[0] = '\0';
+}
+
+static void recordMove(char move)
+{
+    if(pathLength >= PATH_MAX_MOVES)
+    {
+        pathOverflow = 1;
+        return;
+    }
+
+    pathMemory[pathLength] = move;
+    pathLength++;
+    pathMemory[pathLength] = '\0';
+}
+
+static void printPath(void)
+{
+    unsigned int i;
+
+    printf("Recorded path (");
+    printInt(pathLength, 10);
+    printf(" moves): ");
+
+    for(i = 0; i < pathLength; i++)
+        printf("%c", pathMemory[i]);
+
+    if(pathOverflow)
+        printf(" [overflow]");
+
+    printf("\n");
+}
+
 static int clamp(int value, int minValue, int maxValue)
 {
     if(value < minValue)
@@ -261,6 +304,7 @@ int main(void)
         lastDirection = 1;
         intersectionArmed = 1;
         targetFound = 0;
+        resetPath();
 
         while(!stopButton())
         {
@@ -278,6 +322,7 @@ int main(void)
                     printf("Target confirmed sensors=");
                     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                     printf("\n");
+                    printPath();
                     break;
                 }
 
@@ -290,6 +335,7 @@ int main(void)
             if(intersectionArmed && hasLeftIntersection(sensors))
             {
                 leds(LED_INTERSECTION);
+                recordMove('L');
                 chooseLeftAtIntersection();
                 lastDirection = -1;
                 intersectionArmed = 0;
