@@ -18,6 +18,7 @@
 #define TARGET_CONFIRM_MIN_HITS 5
 #define TARGET_MIN_BLACK_SENSORS 4
 #define TARGET_SCAN_SPEED 15
+#define TARGET_READY_TICKS 5
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -381,6 +382,8 @@ static int hasLeftIntersection(unsigned int sensors)
         && (hasForwardPath(sensors) || hasRightPath(sensors));
 }
 
+static int activeSensorCount(unsigned int sensors);
+
 static int hasReturnIntersection(unsigned int sensors)
 {
     int branches = 0;
@@ -395,6 +398,19 @@ static int hasReturnIntersection(unsigned int sensors)
         branches++;
 
     return branches >= 2;
+}
+
+static int isStableLineForTarget(unsigned int sensors)
+{
+    int count;
+
+    sensors &= SENSOR_MASK;
+    count = activeSensorCount(sensors);
+
+    return count > 0
+        && count <= 3
+        && hasForwardPath(sensors)
+        && !hasLeftIntersection(sensors);
 }
 
 static int activeSensorCount(unsigned int sensors)
@@ -422,9 +438,9 @@ static int isTargetCandidate(unsigned int sensors)
     sensors &= SENSOR_MASK;
 
     return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
-        || ((sensors & LEFT_BRANCH)
-            && hasForwardPath(sensors)
-            && (sensors & RIGHT_BRANCH));
+        && hasForwardPath(sensors)
+        && (sensors & LEFT_BRANCH)
+        && (sensors & RIGHT_BRANCH);
 }
 
 static int confirmTarget(unsigned int firstSensors)
@@ -608,11 +624,28 @@ static int runReturnNavigation(void)
     return completed;
 }
 
+static int waitForReturnStart(void)
+{
+    setVel2(0, 0);
+    leds(LED_TARGET_FOUND);
+
+    printf("Target reached; press start for return or stop to reset\n");
+
+    while(startButton() && !stopButton())
+        waitTick20ms();
+
+    while(!startButton() && !stopButton())
+        waitTick20ms();
+
+    return !stopButton();
+}
+
 int main(void)
 {
     unsigned int sensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
+    int targetReadyTicks = 0;
     int targetFound = 0;
     RobotMode mode = MODE_IDLE;
 
@@ -632,6 +665,7 @@ int main(void)
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
+        targetReadyTicks = 0;
         targetFound = 0;
         resetPath();
         resetOptimizedPath();
@@ -644,7 +678,7 @@ int main(void)
 
             if(isTargetCandidate(sensors))
             {
-                if(confirmTarget(sensors))
+                if(targetReadyTicks >= TARGET_READY_TICKS && confirmTarget(sensors))
                 {
                     setVel2(0, 0);
                     leds(LED_TARGET_FOUND);
@@ -662,10 +696,22 @@ int main(void)
                     break;
                 }
 
-                printf("Target rejected sensors=");
+                printf("Target ignored/rejected ready=");
+                printInt(targetReadyTicks, 10);
+                printf(" sensors=");
                 printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                 printf("\n");
                 sensors = readLineSensors(0);
+            }
+
+            if(isStableLineForTarget(sensors))
+            {
+                if(targetReadyTicks < TARGET_READY_TICKS)
+                    targetReadyTicks++;
+            }
+            else if(sensors == 0 || hasLeftIntersection(sensors))
+            {
+                targetReadyTicks = 0;
             }
 
             if(intersectionArmed && hasLeftIntersection(sensors))
@@ -690,16 +736,23 @@ int main(void)
 
         if(targetFound && mode == MODE_TARGET_FOUND)
         {
-            mode = MODE_RETURN;
-            if(runReturnNavigation())
+            if(waitForReturnStart())
             {
-                mode = MODE_FINISHED;
-                leds(LED_TARGET_FOUND);
-                printf("Finished; press stop to reset\n");
+                mode = MODE_RETURN;
+                if(runReturnNavigation())
+                {
+                    mode = MODE_FINISHED;
+                    leds(LED_TARGET_FOUND);
+                    printf("Finished; press stop to reset\n");
+                }
+                else
+                {
+                    printf("Return interrupted by stop button\n");
+                }
             }
             else
             {
-                printf("Return interrupted by stop button\n");
+                printf("Reset requested at target\n");
             }
 
             while(!stopButton())
