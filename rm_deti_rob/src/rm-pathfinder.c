@@ -16,9 +16,10 @@
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_CONFIRM_TICKS 8
 #define TARGET_CONFIRM_MIN_HITS 5
-#define TARGET_MIN_BLACK_SENSORS 4
+#define TARGET_MIN_BLACK_SENSORS 5
 #define TARGET_SCAN_SPEED 15
 #define TARGET_READY_TICKS 5
+#define CODE_VERSION "target-strict-v3"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -438,9 +439,7 @@ static int isTargetCandidate(unsigned int sensors)
     sensors &= SENSOR_MASK;
 
     return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
-        && hasForwardPath(sensors)
-        && (sensors & LEFT_BRANCH)
-        && (sensors & RIGHT_BRANCH);
+        && ((sensors & SENSOR_MASK) == SENSOR_MASK);
 }
 
 static int confirmTarget(unsigned int firstSensors)
@@ -654,7 +653,9 @@ int main(void)
     setVel2(0, 0);
     leds(0x00);
 
-    printf("Path Finder Robot - exploration left\n");
+    printf("Path Finder Robot - exploration left ");
+    printf(CODE_VERSION);
+    printf("\n");
 
     while(1)
     {
