@@ -10,8 +10,10 @@
 #define INTERSECTION_APPROACH_TICKS 6
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 45
-#define TARGET_MIN_TICKS 6
+#define TARGET_CONFIRM_TICKS 8
+#define TARGET_CONFIRM_MIN_HITS 5
 #define TARGET_MIN_BLACK_SENSORS 4
+#define TARGET_SCAN_SPEED 15
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -162,9 +164,40 @@ static int isTargetCandidate(unsigned int sensors)
     sensors &= SENSOR_MASK;
 
     return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
-        && (sensors & LEFT_BRANCH)
-        && hasForwardPath(sensors)
-        && (sensors & RIGHT_BRANCH);
+        || ((sensors & LEFT_BRANCH)
+            && hasForwardPath(sensors)
+            && (sensors & RIGHT_BRANCH));
+}
+
+static int confirmTarget(unsigned int firstSensors)
+{
+    int ticks;
+    int hits = 0;
+    unsigned int sensors = firstSensors & SENSOR_MASK;
+
+    printf("Target scan start sensors=");
+    printInt(firstSensors & SENSOR_MASK, 2 | 5 << 16);
+    printf("\n");
+
+    setVel2(TARGET_SCAN_SPEED, TARGET_SCAN_SPEED);
+    for(ticks = 0; ticks < TARGET_CONFIRM_TICKS && !stopButton(); ticks++)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+
+        if(isTargetCandidate(sensors))
+            hits++;
+    }
+
+    setVel2(0, 0);
+
+    printf("Target scan hits=");
+    printInt(hits, 10);
+    printf(" last=");
+    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+    printf("\n");
+
+    return hits >= TARGET_CONFIRM_MIN_HITS;
 }
 
 static void driveForwardTicks(int ticks)
@@ -210,7 +243,6 @@ int main(void)
     unsigned int sensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
-    int targetTicks = 0;
     int targetFound = 0;
 
     initPIC32();
@@ -228,7 +260,6 @@ int main(void)
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
-        targetTicks = 0;
         targetFound = 0;
 
         while(!stopButton())
@@ -238,41 +269,22 @@ int main(void)
 
             if(isTargetCandidate(sensors))
             {
-                if(targetTicks == 0)
-                {
-                    printf("Target candidate sensors=");
-                    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
-                    printf("\n");
-                }
-
-                targetTicks++;
-
-                if(targetTicks >= TARGET_MIN_TICKS)
+                if(confirmTarget(sensors))
                 {
                     setVel2(0, 0);
                     leds(LED_TARGET_FOUND);
                     targetFound = 1;
 
-                    printf("Target confirmed ticks=");
-                    printInt(targetTicks, 10);
-                    printf(" sensors=");
+                    printf("Target confirmed sensors=");
                     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                     printf("\n");
                     break;
                 }
 
-                followLine(sensors, &lastDirection);
-                continue;
-            }
-
-            if(targetTicks > 0)
-            {
-                printf("Target candidate rejected ticks=");
-                printInt(targetTicks, 10);
-                printf(" sensors=");
+                printf("Target rejected sensors=");
                 printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                 printf("\n");
-                targetTicks = 0;
+                sensors = readLineSensors(0);
             }
 
             if(intersectionArmed && hasLeftIntersection(sensors))
