@@ -10,6 +10,8 @@
 #define INTERSECTION_APPROACH_TICKS 6
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 45
+#define TARGET_MIN_TICKS 6
+#define TARGET_MIN_BLACK_SENSORS 4
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -24,6 +26,9 @@
 #define LEFT_BRANCH     (SENSOR_LEFT_2 | SENSOR_LEFT_1)
 #define CENTER_BRANCH   SENSOR_CENTER
 #define RIGHT_BRANCH    (SENSOR_RIGHT_1 | SENSOR_RIGHT_2)
+#define LED_EXPLORING   0x01
+#define LED_INTERSECTION 0x03
+#define LED_TARGET_FOUND 0x0F
 
 static int clamp(int value, int minValue, int maxValue)
 {
@@ -103,12 +108,63 @@ static void followLine(unsigned int sensors, int *lastDirection)
     setVel2(leftSpeed, rightSpeed);
 }
 
+static int hasLeftPath(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return (sensors & LEFT_BRANCH) == LEFT_BRANCH;
+}
+
+static int hasForwardPath(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return (sensors & CENTER_BRANCH) != 0;
+}
+
+static int hasRightPath(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return (sensors & RIGHT_BRANCH) != 0;
+}
+
 static int hasLeftIntersection(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return (sensors & LEFT_BRANCH) == LEFT_BRANCH
-        && (sensors & (CENTER_BRANCH | RIGHT_BRANCH));
+    return hasLeftPath(sensors)
+        && (hasForwardPath(sensors) || hasRightPath(sensors));
+}
+
+static int activeSensorCount(unsigned int sensors)
+{
+    int count = 0;
+
+    sensors &= SENSOR_MASK;
+
+    if(sensors & SENSOR_LEFT_2)
+        count++;
+    if(sensors & SENSOR_LEFT_1)
+        count++;
+    if(sensors & SENSOR_CENTER)
+        count++;
+    if(sensors & SENSOR_RIGHT_1)
+        count++;
+    if(sensors & SENSOR_RIGHT_2)
+        count++;
+
+    return count;
+}
+
+static int isTargetCandidate(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
+        && (sensors & LEFT_BRANCH)
+        && hasForwardPath(sensors)
+        && (sensors & RIGHT_BRANCH);
 }
 
 static void driveForwardTicks(int ticks)
@@ -154,6 +210,8 @@ int main(void)
     unsigned int sensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
+    int targetTicks = 0;
+    int targetFound = 0;
 
     initPIC32();
     closedLoopControl(true);
@@ -167,22 +225,63 @@ int main(void)
         printf("Press start to run\n");
         while(!startButton());
 
-        leds(0x01);
+        leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
+        targetTicks = 0;
+        targetFound = 0;
 
         while(!stopButton())
         {
             waitTick20ms();
             sensors = readLineSensors(0);
 
+            if(isTargetCandidate(sensors))
+            {
+                if(targetTicks == 0)
+                {
+                    printf("Target candidate sensors=");
+                    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+                    printf("\n");
+                }
+
+                targetTicks++;
+
+                if(targetTicks >= TARGET_MIN_TICKS)
+                {
+                    setVel2(0, 0);
+                    leds(LED_TARGET_FOUND);
+                    targetFound = 1;
+
+                    printf("Target confirmed ticks=");
+                    printInt(targetTicks, 10);
+                    printf(" sensors=");
+                    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+                    printf("\n");
+                    break;
+                }
+
+                followLine(sensors, &lastDirection);
+                continue;
+            }
+
+            if(targetTicks > 0)
+            {
+                printf("Target candidate rejected ticks=");
+                printInt(targetTicks, 10);
+                printf(" sensors=");
+                printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+                printf("\n");
+                targetTicks = 0;
+            }
+
             if(intersectionArmed && hasLeftIntersection(sensors))
             {
-                leds(0x03);
+                leds(LED_INTERSECTION);
                 chooseLeftAtIntersection();
                 lastDirection = -1;
                 intersectionArmed = 0;
-                leds(0x01);
+                leds(LED_EXPLORING);
             }
             else
             {
@@ -194,6 +293,15 @@ int main(void)
         }
 
         setVel2(0, 0);
+
+        if(targetFound)
+        {
+            leds(LED_TARGET_FOUND);
+            printf("Exploration stopped at target; return phase pending\n");
+            while(!stopButton())
+                waitTick20ms();
+        }
+
         leds(0x00);
 
         while(stopButton());

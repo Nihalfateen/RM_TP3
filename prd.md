@@ -310,12 +310,21 @@ Possible patterns:
 
 1. Set up PIC32 toolchain and verify example code.
 2. Implement and calibrate sensor reading.
-3. Implement basic line following.
-4. Implement intersection detection and left-first decisions.
-5. Implement target detection.
-6. Implement path recording.
+3. Implement basic line following. Completed.
+4. Implement intersection detection and left-first decisions. Completed.
+5. Implement target detection. Completed.
+6. Implement path recording. Next.
 7. Implement path optimization.
 8. Implement return navigation.
 9. Tune speeds and thresholds on the real robot.
 10. Prepare report, presentation, and demo.
 
+## 17. Current Project Status
+
+- Milestone 1 is completed: the robot follows the black line using `readLineSensors(0)` and `setVel2(leftSpeed, rightSpeed)`.
+- Milestone 2 is completed: the robot detects left intersections with separated path checks and chooses the left branch during exploration.
+- Milestone 3 is completed: the robot detects the final target marker, stops exploration, turns on a distinct LED pattern, and waits for the stop button. Return behavior is not implemented yet.
+
+Target detection uses a stable wide-line pattern instead of a single sensor sample. A candidate target requires at least four of the five ground sensors to see black, including left, center, and right coverage. The pattern must remain present for `TARGET_MIN_TICKS` consecutive 20 ms ticks before the robot confirms the target. If the pattern disappears before that threshold, the candidate is rejected and normal line following or left-intersection handling continues.
+
+Next milestone: add path recording during exploration so each relevant decision can be stored for later shortest-path return.
