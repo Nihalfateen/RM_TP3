@@ -22,7 +22,7 @@ The implemented agent is `rm_deti_rob/src/rm-pathfinder.c`.
 
 Current implementation version:
 
-- `early-target-v8-encoder-return`
+- `probe-target-v9-encoder-return`
 
 The agent uses:
 
@@ -277,7 +277,7 @@ Possible patterns:
 - all or most sensors detect black for a sustained distance: possible wide target marker
 - no sensors detect black: line lost or gap
 
-The implementation continuously counts sustained wide black readings while line-following and while clearing intersections after turns. If the reading remains wide for `TARGET_EARLY_CONFIRM_TICKS`, the robot stops immediately and confirms the target before running the longer intersection width scan. The intersection scan remains as a fallback confirmation path, and the robot backs up slightly after a long scan so it stops closer to the marker.
+The implementation probes target-like wide readings immediately while line-following and while clearing intersections after turns. On the first wide reading, the robot slows down, measures the physical width in 20 ms ticks, and confirms the target if the measured width reaches `TARGET_WIDTH_MIN_TICKS`. After a confirmed wide marker, the robot backs up slightly so it stops closer to the target instead of after it.
 
 ## 11.1 Tunable Constants
 
@@ -287,8 +287,8 @@ The following constants in `rm-pathfinder.c` should be tuned on the physical rob
 - `TURN_GAIN`: line correction strength.
 - `SEARCH_SPEED`: recovery speed when the line is temporarily lost.
 - `TURN_SPEED`: in-place turning speed.
-- `TARGET_EARLY_CONFIRM_TICKS`: early target confirmation duration during normal line following. Current value: `8`.
-- `TARGET_WIDTH_MIN_TICKS`: minimum wide-line duration needed to confirm the target.
+- `TARGET_WIDTH_MIN_TICKS`: minimum measured wide-line duration needed to confirm the target. Current value: `8`.
+- `TARGET_BACKUP_MAX_TICKS`: maximum reverse correction after target confirmation.
 - `LOST_LINE_DEAD_END_TICKS`: line-loss duration before a dead end is recorded.
 - `START_REACHED_RADIUS_MM`: odometry radius used to stop near the start on return.
 
@@ -395,7 +395,7 @@ The following constants in `rm-pathfinder.c` should be tuned on the physical rob
 - Exploration uses a left-hand rule: choose `L` when available, otherwise `S`, then `R`, then `B`.
 - Dead ends are detected when the line is lost for `LOST_LINE_DEAD_END_TICKS`; the robot records `B` and turns around.
 - Intersections are debounced before action to reduce duplicate decisions from the same physical junction.
-- The target is confirmed early with `TARGET_EARLY_CONFIRM_TICKS`, including during intersection-clearing recovery, with `TARGET_WIDTH_MIN_TICKS` kept as an intersection-scan fallback.
+- The target is confirmed by immediately probing target-like readings and accepting them when the measured width reaches `TARGET_WIDTH_MIN_TICKS`.
 - The raw exploration path is stored in a fixed-size buffer, optimized by simplifying dead-end patterns, then reversed and inverted for return.
 - Return navigation follows the line and executes the optimized return decisions at detected intersections.
 - After the return decisions are exhausted, encoder odometry is used to stop near the original start pose.

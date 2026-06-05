@@ -17,7 +17,6 @@
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 8
-#define TARGET_EARLY_CONFIRM_TICKS 8
 #define TARGET_BACKUP_MAX_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
@@ -28,7 +27,7 @@
 #define LOST_LINE_DEAD_END_TICKS 10
 #define START_REACHED_RADIUS_MM 140
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "early-target-v8-encoder-return"
+#define CODE_VERSION "probe-target-v9-encoder-return"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -513,6 +512,7 @@ static int measureLineWidthTicks(unsigned int firstSensors)
 }
 
 static void printCurrentPose(char *label);
+static void driveBackwardTicks(int ticks);
 
 static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
 {
@@ -532,6 +532,22 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     printOptimizedPath();
     buildReturnPath();
     printReturnPath();
+}
+
+static int probeTarget(unsigned int sensors, char *source)
+{
+    int widthTicks;
+
+    if(!isLineWidthReading(sensors))
+        return 0;
+
+    widthTicks = measureLineWidthTicks(sensors);
+    if(widthTicks < TARGET_WIDTH_MIN_TICKS)
+        return 0;
+
+    driveBackwardTicks(clamp(widthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
+    confirmTarget(sensors, widthTicks, source);
+    return 1;
 }
 
 static void driveForwardTicks(int ticks)
@@ -615,7 +631,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 {
     int normalTicks = 0;
     int totalTicks = 0;
-    int targetWideTicks = 0;
     unsigned int sensors;
 
     while(!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
@@ -623,19 +638,9 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         waitTick20ms();
         sensors = readLineSensors(0);
 
-        if(detectTarget && isLineWidthReading(sensors))
+        if(detectTarget && probeTarget(sensors, "while clearing intersection"))
         {
-            targetWideTicks++;
-            if(targetWideTicks >= TARGET_EARLY_CONFIRM_TICKS)
-            {
-                confirmTarget(sensors, targetWideTicks,
-                    "while clearing intersection");
-                return 2;
-            }
-        }
-        else
-        {
-            targetWideTicks = 0;
+            return 2;
         }
 
         followLine(sensors, lastDirection);
@@ -864,7 +869,6 @@ int main(void)
     int intersectionHistory = 0;
     int intersectionHitTicks = 0;
     int targetFound = 0;
-    int targetWideTicks = 0;
     int lineWidthTicks = 0;
     int lostLineTicks = 0;
     int clearResult = 1;
@@ -896,7 +900,6 @@ int main(void)
         intersectionHistory = 0;
         intersectionHitTicks = 0;
         targetFound = 0;
-        targetWideTicks = 0;
         lostLineTicks = 0;
         resetPath();
         resetOptimizedPath();
@@ -907,16 +910,10 @@ int main(void)
             waitTick20ms();
             sensors = readLineSensors(0);
 
-            if(isLineWidthReading(sensors))
-                targetWideTicks++;
-            else
-                targetWideTicks = 0;
-
-            if(targetWideTicks >= TARGET_EARLY_CONFIRM_TICKS)
+            if(probeTarget(sensors, "early probe"))
             {
                 targetFound = 1;
                 mode = MODE_TARGET_FOUND;
-                confirmTarget(sensors, targetWideTicks, "early");
                 break;
             }
 
