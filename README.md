@@ -9,15 +9,21 @@ This repository contains the Assignment 2 work for the Mobile Robotics Path Find
 - `rm_deti_rob/src/rm-example.c`: original example from the provided package.
 - `rm_deti_rob/src/rm-mr32.c` and `rm_deti_rob/src/rm-mr32.h`: robot support library.
 
-## Current Starting Point
+## Current Implementation
 
-The first implementation focuses on:
+The current implementation in `rm-pathfinder.c` covers the main assignment behavior:
 
 - reading the 5-bit ground sensor mask with `readLineSensors(0)`
 - following the black line using differential wheel speeds
 - searching when the line is temporarily lost
+- detecting intersections with debounce
+- exploring with a left-hand rule: `L`, then `S`, then `R`, then `B`
+- recording and optimizing the exploration path
+- detecting the target as a sustained wide black marker
+- returning on the optimized path
+- using encoder odometry to stop near the starting pose
 
-This is the correct first milestone because intersections, target detection, and shortest-path return all depend on stable line following.
+The robot uses `closedLoopControl(true)`, so wheel encoders are active for motor control and dead-reckoning pose estimation.
 
 ## Build on Linux
 
@@ -60,12 +66,12 @@ Options:
 - use a Linux VM
 - use Docker with an x86_64 Linux container, if Docker Desktop is running
 
-## Next Development Steps
+## Robot Tuning Checklist
 
 1. Test `rm-pathfinder.c` on the real robot.
-2. Tune `BASE_SPEED`, `TURN_GAIN`, and `SEARCH_SPEED`.
+2. Tune `BASE_SPEED`, `TURN_GAIN`, `SEARCH_SPEED`, and `TURN_SPEED`.
 3. Confirm the bit order of the five ground sensors.
-4. Add left-path choice at intersections.
-5. Add target detection for the wide black line.
-6. Add path recording.
-7. Add path simplification and return mode.
+4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target.
+5. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
+6. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
+7. Run and record the three required demo runs.

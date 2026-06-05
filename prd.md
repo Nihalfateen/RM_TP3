@@ -16,6 +16,23 @@ The robot is programmed in C/C++ for a PIC32 microcontroller and is tested on a 
 - Stop accurately at the starting position after returning.
 - Minimize the return time while keeping movement stable and reliable.
 
+## 2.1 Implemented Agent
+
+The implemented agent is `rm_deti_rob/src/rm-pathfinder.c`.
+
+Current implementation version:
+
+- `left-hand-v7-encoder-return`
+
+The agent uses:
+
+- the five IR ground sensors through `readLineSensors(0)`
+- differential wheel commands through `setVel2(left, right)`
+- encoder-based closed-loop motor control through `closedLoopControl(true)`
+- encoder odometry through `setRobotPos(0, 0, 0)` and `getRobotPos(...)`
+
+The encoder odometry is used during the return phase to infer when the robot has arrived near the original start pose after executing the optimized return decisions.
+
 ## 3. Users and Stakeholders
 
 - Student developers implementing and testing the robot behavior.
@@ -85,7 +102,7 @@ When an intersection provides multiple options, the robot shall choose the left 
 Acceptance criteria:
 
 - At each detected intersection, the robot turns left when a left branch exists.
-- If no left branch exists, the robot continues or selects the available path according to the map structure.
+- If no left branch exists, the robot continues straight when possible, turns right when right is the only available branch, or turns back at a dead end.
 - Exploration decisions are recorded for later return-path optimization.
 
 ### FR4: Target Detection
@@ -104,7 +121,7 @@ The robot shall record the path taken during exploration.
 
 Acceptance criteria:
 
-- Each relevant movement decision is stored.
+- Each relevant movement decision is stored as `L`, `S`, `R`, or `B`.
 - The recorded path is sufficient to compute the route back to the start.
 - Dead-end or unnecessary exploration segments can be removed or ignored for the shortest return path.
 
@@ -196,8 +213,10 @@ The robot should operate as a finite-state machine.
 
 - Follow the black line.
 - Detect intersections.
-- Prefer the left branch when multiple options exist.
+- Prefer the left branch when it exists.
+- If no left branch exists, choose straight, then right, then backtrack.
 - Record movement decisions.
+- Detect dead ends when the line is lost for a sustained interval and record `B`.
 - Continue until the target marker is detected.
 
 ### State 3: Target Found
@@ -211,6 +230,7 @@ The robot should operate as a finite-state machine.
 - Follow the black line back toward the start.
 - Use the optimized path decisions at intersections.
 - Increase speed if stable and safe.
+- After all return decisions are executed, use encoder odometry to stop when the robot is within the configured start radius.
 
 ### State 5: Finished
 
@@ -228,11 +248,18 @@ During exploration, the robot records decisions such as:
 
 After reaching the target, the recorded path should be simplified to remove unnecessary moves. Since the map has no cycles, dead-end exploration branches can be eliminated, allowing the robot to return using the shortest known route.
 
-Example simplification idea:
+Implemented simplification:
 
-- Detect movement patterns that enter and leave dead ends.
-- Replace longer decision sequences with shorter equivalent turns.
-- Reverse the optimized route for the return phase.
+- Convert moves to relative angles: `S = 0`, `R = 90`, `B = 180`, `L = 270`.
+- Whenever a pattern `move, B, move` appears at the end of the path, replace it with the equivalent single relative turn.
+- Reverse the optimized start-to-target route.
+- Invert left/right moves to obtain the target-to-start return route.
+
+Example:
+
+- Raw exploration path: `L B R`
+- Angle sum: `270 + 180 + 90 = 540`, equivalent to `180`
+- Optimized move: `B`
 
 ## 11. Sensor Interpretation
 
@@ -250,6 +277,20 @@ Possible patterns:
 - all or most sensors detect black for a sustained distance: possible wide target marker
 - no sensors detect black: line lost or gap
 
+The implementation currently treats a non-normal, multi-branch sensor pattern as an intersection candidate. It confirms target detection by measuring how many 20 ms ticks the robot remains over a wide black reading while moving slowly forward. A sustained wide reading is treated as the target marker.
+
+## 11.1 Tunable Constants
+
+The following constants in `rm-pathfinder.c` should be tuned on the physical robot:
+
+- `BASE_SPEED`: normal line-following speed.
+- `TURN_GAIN`: line correction strength.
+- `SEARCH_SPEED`: recovery speed when the line is temporarily lost.
+- `TURN_SPEED`: in-place turning speed.
+- `TARGET_WIDTH_MIN_TICKS`: minimum wide-line duration needed to confirm the target.
+- `LOST_LINE_DEAD_END_TICKS`: line-loss duration before a dead end is recorded.
+- `START_REACHED_RADIUS_MM`: odometry radius used to stop near the start on return.
+
 ## 12. Testing Plan
 
 ### Unit-Level Tests
@@ -258,6 +299,33 @@ Possible patterns:
 - Validate line-position calculation from the five sensors.
 - Validate turn command functions.
 - Validate path simplification logic with predefined path sequences.
+
+### Integration Tests on Robot
+
+1. Compile on Linux with the PIC32 toolchain:
+
+   ```sh
+   cd rm_deti_rob/src
+   pcompile rm-pathfinder.c rm-mr32.c
+   ```
+
+2. Upload:
+
+   ```sh
+   ldpic32 -w rm-pathfinder.hex
+   pterm
+   ```
+
+3. Press the robot start button and verify:
+
+   - stable line following
+   - left-first behavior at intersections
+   - `L/S/R/B` moves printed in the terminal
+   - target detection on the wide black line
+   - optimized and return paths printed
+   - return navigation stops near the start position using encoder odometry
+
+4. Run the demo three times and tune the constants if the robot overshoots intersections, misclassifies the target, or stops too far from the start.
 
 ### Integration Tests
 
@@ -316,21 +384,19 @@ Possible patterns:
 6. Implement path recording. Completed.
 7. Implement path optimization. Completed.
 8. Implement return navigation. Completed.
-9. Implement start-position detection and final stopping behavior. Next.
+9. Implement start-position detection and final stopping behavior. Completed with encoder odometry.
 10. Tune speeds and thresholds on the real robot.
 11. Prepare report, presentation, and demo.
 
 ## 17. Current Project Status
 
-- Milestone 1 is completed: the robot follows the black line using `readLineSensors(0)` and `setVel2(leftSpeed, rightSpeed)`.
-- Milestone 2 is completed: the robot detects left intersections with separated path checks and chooses the left branch during exploration.
-- Milestone 3 is completed: the robot detects the final target marker by measuring the physical width of wide black readings over time, stops exploration, turns on a distinct LED pattern, and switches toward return behavior after path processing.
-- Milestone 4 is completed: exploration movements are now recorded in a compact fixed-size path buffer after physical execution. The current implementation uses a lightweight rolling debounce for possible left intersections: at least 2 positive `hasLeftIntersection()` readings must appear within 3 consecutive 20 ms samples before the intersection routine starts. Once an intersection is accepted, the robot measures line width, checks for the target marker, and otherwise executes the 90-degree left turn immediately. Narrow intersection widths such as 1 tick are still accepted because real junctions on the physical track can appear briefly at the current speed and sensor timing. The move `L` is recorded only after `turnLeftToLine()` succeeds and the new line is reacquired. If the first left-turn attempt fails, the robot retries once; if the retry also fails, it stops and prints `Left turn failed twice; stopping`. After a successful turn, intersection detection stays disarmed until `waitUntilNormalLine()` observes stable normal line tracking for several ticks, then it prints `Intersection cleared` and `Re-armed for next intersection`. The buffer prevents overflow and the recorded path is printed when the target is confirmed.
-- Milestone 5 is completed: the robot now builds a separate optimized path buffer from the recorded exploration path after the target is confirmed. The optimizer uses fixed-size memory, rejects unsupported move symbols, prevents optimized-buffer overflow, and simplifies common dead-end patterns that contain `B`, such as `L B L` to `S`, `L B S` to `R`, `S B S` to `B`, and related turn combinations. When the target is confirmed, the program prints both the raw recorded path and the optimized path.
-- Milestone 6 is completed: after target confirmation, the robot builds a fixed-size return path from the optimized exploration path, stops at the target, and waits for a second start-button press before beginning the return phase. The robot resets encoder odometry to `(0, 0, 0)` at the beginning of each run and prints the target pose when the width-based target detector confirms the target marker. Once return mode starts, it turns around, follows the line, debounces return-intersection candidates, and executes one return move at each validated detected intersection. The return path is constructed by reading the optimized path backwards and inverting each move: `L` becomes `R`, `R` becomes `L`, while `S` and `B` remain unchanged. After all return decisions are executed, the robot continues line following until encoder odometry reports that it is within `START_REACHED_RADIUS_MM` of the start pose, or until `RETURN_START_SEARCH_MAX_TICKS` is reached. The implementation prints the return path, each executed return move, and the final odometry pose used for start detection.
+- The robot follows the black line using `readLineSensors(0)` and differential speed correction.
+- Exploration uses a left-hand rule: choose `L` when available, otherwise `S`, then `R`, then `B`.
+- Dead ends are detected when the line is lost for `LOST_LINE_DEAD_END_TICKS`; the robot records `B` and turns around.
+- Intersections are debounced before action to reduce duplicate decisions from the same physical junction.
+- The target is confirmed by measuring sustained wide black readings with `TARGET_WIDTH_MIN_TICKS`.
+- The raw exploration path is stored in a fixed-size buffer, optimized by simplifying dead-end patterns, then reversed and inverted for return.
+- Return navigation follows the line and executes the optimized return decisions at detected intersections.
+- After the return decisions are exhausted, encoder odometry is used to stop near the original start pose.
 
-Target detection uses measured line width after a lightly debounced left-intersection acceptance, instead of scanning or counting target-like readings during normal line following. The robot follows the line normally until the rolling debounce sees at least 2 positive `hasLeftIntersection()` readings within 3 consecutive 20 ms samples. It then measures how many 20 ms ticks a wide line or intersection reading remains visible while moving slowly. If that measured width reaches `TARGET_WIDTH_MIN_TICKS`, the robot confirms the final wide black marker as the target and stops exploration. Otherwise, the robot treats the accepted reading as a normal intersection, performs the 90-degree left turn immediately, and records `L` only after the new line is successfully reacquired. After the turn, the robot waits for stable normal-line tracking before re-arming detection, so repeated sensor patterns inside the same physical junction are not recorded as duplicate moves. This keeps target detection tied to the physical width of the black marker while avoiding strict post-approach rejection of valid junctions.
-
-Return navigation now uses encoder odometry for final start detection instead of stopping immediately when the return-path move counter is exhausted. This depends on wheel encoder calibration and can still drift if the wheels slip during turns, but it gives the robot an explicit start-position condition without requiring a separate visual start marker.
-
-Next milestone: implement start-position detection and final stopping behavior so the robot can confirm the actual start location before entering the finished state.
+Remaining work is physical calibration: tune speeds, line-width timing, dead-end timing, and odometry stop radius on the real robot and record the three demo runs.

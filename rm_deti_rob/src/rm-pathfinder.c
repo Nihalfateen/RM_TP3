@@ -23,9 +23,10 @@
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
+#define LOST_LINE_DEAD_END_TICKS 10
 #define START_REACHED_RADIUS_MM 140
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "intersection-debounce-v6-odometry"
+#define CODE_VERSION "left-hand-v7-encoder-return"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -390,6 +391,7 @@ static int hasLeftIntersection(unsigned int sensors)
 }
 
 static int isNormalLine(unsigned int sensors);
+static int isIntersectionCandidate(unsigned int sensors);
 
 static int hasReturnIntersection(unsigned int sensors)
 {
@@ -411,8 +413,7 @@ static int isReturnIntersectionCandidate(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return hasReturnIntersection(sensors)
-        && !isNormalLine(sensors);
+    return isIntersectionCandidate(sensors);
 }
 
 static int activeSensorCount(unsigned int sensors)
@@ -453,6 +454,36 @@ static int isLineWidthReading(unsigned int sensors)
         && hasForwardPath(sensors)
         && ((sensors & (SENSOR_LEFT_1 | SENSOR_LEFT_2))
             || (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2)));
+}
+
+static int isIntersectionCandidate(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    if(isNormalLine(sensors))
+        return 0;
+
+    if(hasReturnIntersection(sensors))
+        return 1;
+
+    if(hasLeftPath(sensors) || hasRightPath(sensors))
+        return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS;
+
+    return 0;
+}
+
+static char chooseExplorationMove(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    if(hasLeftPath(sensors))
+        return 'L';
+    if(hasForwardPath(sensors))
+        return 'S';
+    if(hasRightPath(sensors))
+        return 'R';
+
+    return 'B';
 }
 
 static int measureLineWidthTicks(unsigned int firstSensors)
@@ -675,6 +706,32 @@ static void executeReturnMove(char move)
         printf("Unsupported return move ignored: %c\n", move);
 }
 
+static int executeExplorationMove(char move)
+{
+    printf("Exploration move: %c\n", move);
+
+    if(move == 'L')
+        return turnLeftToLine();
+    if(move == 'R')
+    {
+        turnRightToLine();
+        return 1;
+    }
+    if(move == 'B')
+    {
+        turnAroundToLine();
+        return 1;
+    }
+    if(move == 'S')
+    {
+        driveForwardTicks(INTERSECTION_APPROACH_TICKS);
+        return 1;
+    }
+
+    printf("Unsupported exploration move ignored: %c\n", move);
+    return 0;
+}
+
 static int runReturnNavigation(void)
 {
     unsigned int sensors;
@@ -757,6 +814,8 @@ int main(void)
     int intersectionHitTicks = 0;
     int targetFound = 0;
     int lineWidthTicks = 0;
+    int lostLineTicks = 0;
+    char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
     initPIC32();
@@ -784,6 +843,7 @@ int main(void)
         intersectionHistory = 0;
         intersectionHitTicks = 0;
         targetFound = 0;
+        lostLineTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -793,10 +853,29 @@ int main(void)
             waitTick20ms();
             sensors = readLineSensors(0);
 
+            if((sensors & SENSOR_MASK) == 0)
+                lostLineTicks++;
+            else
+                lostLineTicks = 0;
+
+            if(lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            {
+                leds(LED_INTERSECTION);
+                printf("Dead end detected\n");
+                lostLineTicks = 0;
+                recordMove('B');
+                printf("Recorded move=B\n");
+                turnAroundToLine();
+                lastDirection = 1;
+                intersectionArmed = waitUntilNormalLine(&lastDirection);
+                leds(LED_EXPLORING);
+                continue;
+            }
+
             if(intersectionArmed)
             {
                 intersectionHistory <<= 1;
-                if(hasLeftIntersection(sensors))
+                if(isIntersectionCandidate(sensors))
                     intersectionHistory |= 1;
                 intersectionHistory &= 0x07;
 
@@ -845,22 +924,26 @@ int main(void)
 
                     if(!stopButton())
                     {
-                        printf("Executing left turn\n");
-                        if(!turnLeftToLine())
+                        chosenMove = chooseExplorationMove(junctionSensors);
+                        if(!executeExplorationMove(chosenMove))
                         {
-                            printf("Left turn failed; retrying\n");
-                            if(!turnLeftToLine())
+                            printf("Exploration move failed; retrying\n");
+                            if(!executeExplorationMove(chosenMove))
                             {
                                 setVel2(0, 0);
-                                printf("Left turn failed twice; stopping\n");
+                                printf("Exploration move failed twice; stopping\n");
                                 break;
                             }
                         }
 
-                        printf("Left turn completed\n");
-                        recordMove('L');
-                        printf("Recorded move=L\n");
-                        lastDirection = -1;
+                        printf("Exploration move completed\n");
+                        recordMove(chosenMove);
+                        printf("Recorded move=");
+                        printf("%c\n", chosenMove);
+                        if(chosenMove == 'L')
+                            lastDirection = -1;
+                        else if(chosenMove == 'R')
+                            lastDirection = 1;
                         intersectionArmed = waitUntilNormalLine(&lastDirection);
                     }
                     leds(LED_EXPLORING);
