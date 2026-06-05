@@ -16,8 +16,9 @@
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 12
-#define TARGET_EARLY_CONFIRM_TICKS 10
+#define TARGET_WIDTH_MIN_TICKS 8
+#define TARGET_EARLY_CONFIRM_TICKS 8
+#define TARGET_BACKUP_MAX_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
@@ -542,6 +543,16 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
+static void driveBackwardTicks(int ticks)
+{
+    int i;
+
+    setVel2(-LINE_WIDTH_SCAN_SPEED, -LINE_WIDTH_SCAN_SPEED);
+    for(i = 0; i < ticks && !stopButton(); i++)
+        waitTick20ms();
+    setVel2(0, 0);
+}
+
 static void printCurrentPose(char *label)
 {
     double x;
@@ -600,16 +611,33 @@ static int followLineUntilStartPose(int *lastDirection)
     return 0;
 }
 
-static int waitUntilNormalLine(int *lastDirection)
+static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 {
     int normalTicks = 0;
     int totalTicks = 0;
+    int targetWideTicks = 0;
     unsigned int sensors;
 
     while(!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
+
+        if(detectTarget && isLineWidthReading(sensors))
+        {
+            targetWideTicks++;
+            if(targetWideTicks >= TARGET_EARLY_CONFIRM_TICKS)
+            {
+                confirmTarget(sensors, targetWideTicks,
+                    "while clearing intersection");
+                return 2;
+            }
+        }
+        else
+        {
+            targetWideTicks = 0;
+        }
+
         followLine(sensors, lastDirection);
 
         if(isNormalLine(sensors))
@@ -768,7 +796,7 @@ static int runReturnNavigation(void)
     printf("Return navigation starting\n");
 
     turnAroundToLine();
-    intersectionArmed = waitUntilNormalLine(&lastDirection);
+    intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
 
     while(!stopButton())
     {
@@ -797,7 +825,7 @@ static int runReturnNavigation(void)
             returnCandidateTicks = 0;
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
-            intersectionArmed = waitUntilNormalLine(&lastDirection);
+            intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
             leds(LED_EXPLORING | LED_TARGET_FOUND);
         }
         else
@@ -839,6 +867,7 @@ int main(void)
     int targetWideTicks = 0;
     int lineWidthTicks = 0;
     int lostLineTicks = 0;
+    int clearResult = 1;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -905,7 +934,14 @@ int main(void)
                 printf("Recorded move=B\n");
                 turnAroundToLine();
                 lastDirection = 1;
-                intersectionArmed = waitUntilNormalLine(&lastDirection);
+                clearResult = waitUntilNormalLine(&lastDirection, 1);
+                if(clearResult == 2)
+                {
+                    targetFound = 1;
+                    mode = MODE_TARGET_FOUND;
+                    break;
+                }
+                intersectionArmed = clearResult;
                 leds(LED_EXPLORING);
                 continue;
             }
@@ -943,6 +979,8 @@ int main(void)
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
+                        driveBackwardTicks(clamp(lineWidthTicks / 2,
+                            0, TARGET_BACKUP_MAX_TICKS));
                         confirmTarget(junctionSensors, lineWidthTicks,
                             "at intersection");
                         break;
@@ -970,7 +1008,14 @@ int main(void)
                             lastDirection = -1;
                         else if(chosenMove == 'R')
                             lastDirection = 1;
-                        intersectionArmed = waitUntilNormalLine(&lastDirection);
+                        clearResult = waitUntilNormalLine(&lastDirection, 1);
+                        if(clearResult == 2)
+                        {
+                            targetFound = 1;
+                            mode = MODE_TARGET_FOUND;
+                            break;
+                        }
+                        intersectionArmed = clearResult;
                     }
                     leds(LED_EXPLORING);
                     continue;
