@@ -20,6 +20,7 @@ The current implementation in `rm-pathfinder.c` covers the main assignment behav
 - exploring with a left-hand rule: `L`, then `S`, then `R`, then `B`
 - recording and optimizing the exploration path
 - detecting the target as a sustained wide black marker
+- stopping early on sustained wide readings before the longer target scan can overshoot
 - returning on the optimized path
 - using encoder odometry to stop near the starting pose
 
@@ -72,6 +73,7 @@ Options:
 2. Tune `BASE_SPEED`, `TURN_GAIN`, `SEARCH_SPEED`, and `TURN_SPEED`.
 3. Confirm the bit order of the five ground sensors.
 4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target.
-5. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
-6. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
-7. Run and record the three required demo runs.
+5. Tune `TARGET_EARLY_CONFIRM_TICKS` if the robot still passes the target or stops on normal intersections.
+6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
+7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
+8. Run and record the three required demo runs.

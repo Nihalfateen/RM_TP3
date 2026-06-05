@@ -17,6 +17,7 @@
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 12
+#define TARGET_EARLY_CONFIRM_TICKS 10
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
@@ -26,7 +27,7 @@
 #define LOST_LINE_DEAD_END_TICKS 10
 #define START_REACHED_RADIUS_MM 140
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "left-hand-v7-encoder-return"
+#define CODE_VERSION "early-target-v8-encoder-return"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -510,6 +511,26 @@ static int measureLineWidthTicks(unsigned int firstSensors)
     return widthTicks;
 }
 
+static void confirmTarget(unsigned int sensors, int widthTicks, const char *source)
+{
+    setVel2(0, 0);
+    leds(LED_TARGET_FOUND);
+
+    printf("Target confirmed ");
+    printf(source);
+    printf(" sensors=");
+    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+    printf(" width=");
+    printInt(widthTicks, 10);
+    printf("\n");
+    printCurrentPose("Target pose");
+    printPath();
+    optimizePath();
+    printOptimizedPath();
+    buildReturnPath();
+    printReturnPath();
+}
+
 static void driveForwardTicks(int ticks)
 {
     int i;
@@ -813,6 +834,7 @@ int main(void)
     int intersectionHistory = 0;
     int intersectionHitTicks = 0;
     int targetFound = 0;
+    int targetWideTicks = 0;
     int lineWidthTicks = 0;
     int lostLineTicks = 0;
     char chosenMove = 'S';
@@ -843,6 +865,7 @@ int main(void)
         intersectionHistory = 0;
         intersectionHitTicks = 0;
         targetFound = 0;
+        targetWideTicks = 0;
         lostLineTicks = 0;
         resetPath();
         resetOptimizedPath();
@@ -852,6 +875,19 @@ int main(void)
         {
             waitTick20ms();
             sensors = readLineSensors(0);
+
+            if(isLineWidthReading(sensors))
+                targetWideTicks++;
+            else
+                targetWideTicks = 0;
+
+            if(targetWideTicks >= TARGET_EARLY_CONFIRM_TICKS)
+            {
+                targetFound = 1;
+                mode = MODE_TARGET_FOUND;
+                confirmTarget(sensors, targetWideTicks, "early");
+                break;
+            }
 
             if((sensors & SENSOR_MASK) == 0)
                 lostLineTicks++;
@@ -903,22 +939,10 @@ int main(void)
 
                     if(lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
                     {
-                        setVel2(0, 0);
-                        leds(LED_TARGET_FOUND);
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
-
-                        printf("Target confirmed at intersection sensors=");
-                        printInt(junctionSensors & SENSOR_MASK, 2 | 5 << 16);
-                        printf(" width=");
-                        printInt(lineWidthTicks, 10);
-                        printf("\n");
-                        printCurrentPose("Target pose");
-                        printPath();
-                        optimizePath();
-                        printOptimizedPath();
-                        buildReturnPath();
-                        printReturnPath();
+                        confirmTarget(junctionSensors, lineWidthTicks,
+                            "at intersection");
                         break;
                     }
 
