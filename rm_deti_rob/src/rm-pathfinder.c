@@ -511,7 +511,9 @@ static int measureLineWidthTicks(unsigned int firstSensors)
     return widthTicks;
 }
 
-static void confirmTarget(unsigned int sensors, int widthTicks, const char *source)
+static void printCurrentPose(char *label);
+
+static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
 {
     setVel2(0, 0);
     leds(LED_TARGET_FOUND);
@@ -540,7 +542,7 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
-static void printCurrentPose(const char *label)
+static void printCurrentPose(char *label)
 {
     double x;
     double y;
