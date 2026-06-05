@@ -18,12 +18,14 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
+#define INTERSECTION_WIDTH_MIN_TICKS 2
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
-#define CODE_VERSION "intersection-debounce-v3"
+#define RETURN_FINISH_FORWARD_TICKS 60
+#define CODE_VERSION "intersection-debounce-v4"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -486,6 +488,19 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
+static void followLineForTicks(int ticks, int *lastDirection)
+{
+    int i;
+    unsigned int sensors;
+
+    for(i = 0; i < ticks && !stopButton(); i++)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0);
+        followLine(sensors, lastDirection);
+    }
+}
+
 static int waitUntilNormalLine(int *lastDirection)
 {
     int normalTicks = 0;
@@ -567,6 +582,8 @@ static void turnRightToLine(void)
             break;
         }
     }
+
+    setVel2(0, 0);
 }
 
 static void turnAroundToLine(void)
@@ -589,6 +606,8 @@ static void turnAroundToLine(void)
             break;
         }
     }
+
+    setVel2(0, 0);
 }
 
 static void executeReturnMove(char move)
@@ -633,8 +652,10 @@ static int runReturnNavigation(void)
 
         if(returnIndex >= returnPathLength)
         {
+            printf("Return decisions complete; following final straight\n");
+            followLineForTicks(RETURN_FINISH_FORWARD_TICKS, &lastDirection);
             setVel2(0, 0);
-            printf("Return path complete; temporary stop at presumed start\n");
+            printf("Return path complete; final stop\n");
             completed = 1;
             break;
         }
@@ -770,6 +791,14 @@ int main(void)
                         buildReturnPath();
                         printReturnPath();
                         break;
+                    }
+
+                    if(lineWidthTicks < INTERSECTION_WIDTH_MIN_TICKS)
+                    {
+                        printf("Intersection too narrow; ignored\n");
+                        intersectionArmed = waitUntilNormalLine(&lastDirection);
+                        leds(LED_EXPLORING);
+                        continue;
                     }
 
                     if(!stopButton())
