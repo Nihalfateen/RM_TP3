@@ -20,8 +20,10 @@
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
-#define JUNCTION_APPROACH_TICKS 4
-#define CODE_VERSION "intersection-validate-v1"
+#define JUNCTION_APPROACH_TICKS 2
+#define INTERSECTION_DETECT_TICKS 3
+#define INTERSECTION_WIDTH_MIN_TICKS 2
+#define CODE_VERSION "intersection-debounce-v1"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -385,12 +387,22 @@ static int hasLeftIntersection(unsigned int sensors)
         && (hasForwardPath(sensors) || hasRightPath(sensors));
 }
 
+static int isNormalLine(unsigned int sensors);
+
 static int isCenteredIntersection(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
     return hasLeftIntersection(sensors)
         && hasForwardPath(sensors);
+}
+
+static int isIntersectionCandidate(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return isCenteredIntersection(sensors)
+        && !isNormalLine(sensors);
 }
 
 static int hasReturnIntersection(unsigned int sensors)
@@ -407,6 +419,14 @@ static int hasReturnIntersection(unsigned int sensors)
         branches++;
 
     return branches >= 2;
+}
+
+static int isReturnIntersectionCandidate(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return hasReturnIntersection(sensors)
+        && !isNormalLine(sensors);
 }
 
 static int activeSensorCount(unsigned int sensors)
@@ -626,6 +646,7 @@ static int runReturnNavigation(void)
     unsigned int returnIndex = 0;
     int lastDirection = 1;
     int intersectionArmed = 1;
+    int returnCandidateTicks = 0;
     int completed = 0;
 
     leds(LED_EXPLORING | LED_TARGET_FOUND);
@@ -647,9 +668,15 @@ static int runReturnNavigation(void)
             break;
         }
 
-        if(intersectionArmed && hasReturnIntersection(sensors))
+        if(intersectionArmed && isReturnIntersectionCandidate(sensors))
+            returnCandidateTicks++;
+        else
+            returnCandidateTicks = 0;
+
+        if(intersectionArmed && returnCandidateTicks >= INTERSECTION_DETECT_TICKS)
         {
             leds(LED_INTERSECTION);
+            returnCandidateTicks = 0;
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
             intersectionArmed = waitUntilIntersectionCleared(&lastDirection);
@@ -687,6 +714,7 @@ int main(void)
     unsigned int junctionSensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
+    int intersectionCandidateTicks = 0;
     int targetFound = 0;
     int lineWidthTicks = 0;
     RobotMode mode = MODE_IDLE;
@@ -709,6 +737,7 @@ int main(void)
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
+        intersectionCandidateTicks = 0;
         targetFound = 0;
         resetPath();
         resetOptimizedPath();
@@ -719,10 +748,16 @@ int main(void)
             waitTick20ms();
             sensors = readLineSensors(0);
 
-            if(intersectionArmed && hasLeftIntersection(sensors))
+            if(intersectionArmed && isIntersectionCandidate(sensors))
+                intersectionCandidateTicks++;
+            else
+                intersectionCandidateTicks = 0;
+
+            if(intersectionArmed && intersectionCandidateTicks >= INTERSECTION_DETECT_TICKS)
             {
                 leds(LED_INTERSECTION);
                 printf("Intersection detected\n");
+                intersectionCandidateTicks = 0;
                 junctionSensors = approachJunction();
 
                 if(!isCenteredIntersection(junctionSensors))
@@ -759,6 +794,17 @@ int main(void)
                 }
 
                 if(lineWidthTicks == 0)
+                {
+                    printf("Intersection rejected unstable sensors=");
+                    printInt(junctionSensors & SENSOR_MASK, 2 | 5 << 16);
+                    printf("\n");
+                    leds(LED_EXPLORING);
+                    sensors = readLineSensors(0);
+                    followLine(sensors, &lastDirection);
+                    continue;
+                }
+
+                if(lineWidthTicks < INTERSECTION_WIDTH_MIN_TICKS)
                 {
                     printf("Intersection rejected unstable sensors=");
                     printInt(junctionSensors & SENSOR_MASK, 2 | 5 << 16);
