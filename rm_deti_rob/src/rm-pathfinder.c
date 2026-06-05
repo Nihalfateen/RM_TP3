@@ -18,14 +18,14 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
-#define INTERSECTION_WIDTH_MIN_TICKS 2
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
-#define RETURN_FINISH_FORWARD_TICKS 60
-#define CODE_VERSION "intersection-debounce-v4"
+#define START_REACHED_RADIUS_MM 140
+#define RETURN_START_SEARCH_MAX_TICKS 600
+#define CODE_VERSION "intersection-debounce-v6-odometry"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -488,17 +488,62 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
-static void followLineForTicks(int ticks, int *lastDirection)
+static void printCurrentPose(const char *label)
 {
-    int i;
+    double x;
+    double y;
+    double theta;
+
+    getRobotPos(&x, &y, &theta);
+    printf(label);
+    printf(" x=");
+    printInt((int)x, 10);
+    printf(" y=");
+    printInt((int)y, 10);
+    printf(" theta=");
+    printInt((int)(theta * 1000.0), 10);
+    printf("mrad\n");
+}
+
+static int isNearStartPose(void)
+{
+    double x;
+    double y;
+    double theta;
+    double distanceSquared;
+    double radiusSquared;
+
+    getRobotPos(&x, &y, &theta);
+    distanceSquared = (x * x) + (y * y);
+    radiusSquared = (double)START_REACHED_RADIUS_MM
+        * (double)START_REACHED_RADIUS_MM;
+
+    return distanceSquared <= radiusSquared;
+}
+
+static int followLineUntilStartPose(int *lastDirection)
+{
+    int ticks = 0;
     unsigned int sensors;
 
-    for(i = 0; i < ticks && !stopButton(); i++)
+    while(!stopButton() && ticks < RETURN_START_SEARCH_MAX_TICKS)
     {
+        if(isNearStartPose())
+        {
+            setVel2(0, 0);
+            printCurrentPose("Start pose reached");
+            return 1;
+        }
+
         waitTick20ms();
         sensors = readLineSensors(0);
         followLine(sensors, lastDirection);
+        ticks++;
     }
+
+    setVel2(0, 0);
+    printCurrentPose("Start pose search timeout");
+    return 0;
 }
 
 static int waitUntilNormalLine(int *lastDirection)
@@ -652,11 +697,12 @@ static int runReturnNavigation(void)
 
         if(returnIndex >= returnPathLength)
         {
-            printf("Return decisions complete; following final straight\n");
-            followLineForTicks(RETURN_FINISH_FORWARD_TICKS, &lastDirection);
-            setVel2(0, 0);
-            printf("Return path complete; final stop\n");
-            completed = 1;
+            printf("Return decisions complete; searching start pose\n");
+            completed = followLineUntilStartPose(&lastDirection);
+            if(completed)
+                printf("Return path complete; odometry start reached\n");
+            else
+                printf("Return path complete; odometry start not reached\n");
             break;
         }
 
@@ -727,6 +773,9 @@ int main(void)
         printf("Press start to run\n");
         while(!startButton());
 
+        setRobotPos(0.0, 0.0, 0.0);
+        printCurrentPose("Start pose reset");
+
         mode = MODE_EXPLORE;
         leds(LED_EXPLORING);
         lastDirection = 1;
@@ -785,20 +834,13 @@ int main(void)
                         printf(" width=");
                         printInt(lineWidthTicks, 10);
                         printf("\n");
+                        printCurrentPose("Target pose");
                         printPath();
                         optimizePath();
                         printOptimizedPath();
                         buildReturnPath();
                         printReturnPath();
                         break;
-                    }
-
-                    if(lineWidthTicks < INTERSECTION_WIDTH_MIN_TICKS)
-                    {
-                        printf("Intersection too narrow; ignored\n");
-                        intersectionArmed = waitUntilNormalLine(&lastDirection);
-                        leds(LED_EXPLORING);
-                        continue;
                     }
 
                     if(!stopButton())
