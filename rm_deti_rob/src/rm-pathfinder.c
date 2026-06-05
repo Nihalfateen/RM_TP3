@@ -18,7 +18,7 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
-#define CODE_VERSION "target-width-v1"
+#define CODE_VERSION "intersection-width-v1"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -418,16 +418,6 @@ static int activeSensorCount(unsigned int sensors)
     return count;
 }
 
-static int isTargetCandidate(unsigned int sensors)
-{
-    sensors &= SENSOR_MASK;
-
-    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
-        && hasForwardPath(sensors)
-        && (sensors & (SENSOR_LEFT_1 | SENSOR_LEFT_2))
-        && (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2));
-}
-
 static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
@@ -638,7 +628,6 @@ int main(void)
     int intersectionArmed = 1;
     int targetFound = 0;
     int lineWidthTicks = 0;
-    int candidateWasLeftIntersection = 0;
     RobotMode mode = MODE_IDLE;
 
     initPIC32();
@@ -668,64 +657,6 @@ int main(void)
         {
             waitTick20ms();
             sensors = readLineSensors(0);
-
-            if(isTargetCandidate(sensors))
-            {
-                candidateWasLeftIntersection = hasLeftIntersection(sensors);
-                lineWidthTicks = measureLineWidthTicks(sensors);
-
-                if(lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
-                {
-                    setVel2(0, 0);
-                    leds(LED_TARGET_FOUND);
-                    targetFound = 1;
-                    mode = MODE_TARGET_FOUND;
-
-                    printf("Target confirmed sensors=");
-                    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
-                    printf(" width=");
-                    printInt(lineWidthTicks, 10);
-                    printf("\n");
-                    printPath();
-                    optimizePath();
-                    printOptimizedPath();
-                    buildReturnPath();
-                    printReturnPath();
-                    break;
-                }
-
-                printf("Line width ignored/rejected width=");
-                printInt(lineWidthTicks, 10);
-                printf(" sensors=");
-                printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
-                printf("\n");
-
-                if(stopButton())
-                    break;
-
-                if(candidateWasLeftIntersection)
-                {
-                    leds(LED_INTERSECTION);
-                    printf("Intersection detected\n");
-                    printf("Executing left turn\n");
-                    if(turnLeftToLine())
-                    {
-                        printf("Left turn completed\n");
-                        recordMove('L');
-                        printf("Recorded move=L\n");
-                        lastDirection = -1;
-                    }
-                    else
-                    {
-                        printf("Left turn failed; move not recorded\n");
-                    }
-                    intersectionArmed = 0;
-                    leds(LED_EXPLORING);
-                    continue;
-                }
-
-                sensors = readLineSensors(0);
-            }
 
             if(intersectionArmed && hasLeftIntersection(sensors))
             {
