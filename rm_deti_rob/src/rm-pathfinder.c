@@ -14,12 +14,11 @@
 #define RIGHT_TURN_MAX_TICKS 45
 #define TURN_AROUND_MIN_TICKS 18
 #define TURN_AROUND_MAX_TICKS 75
-#define TARGET_CONFIRM_TICKS 8
-#define TARGET_CONFIRM_MIN_HITS 6
-#define TARGET_MIN_BLACK_SENSORS 4
-#define TARGET_SCAN_SPEED 15
-#define TARGET_READY_TICKS 5
-#define CODE_VERSION "target-stable-v5"
+#define TARGET_MIN_BLACK_SENSORS 3
+#define LINE_WIDTH_SCAN_MAX_TICKS 30
+#define TARGET_WIDTH_MIN_TICKS 12
+#define LINE_WIDTH_SCAN_SPEED 15
+#define CODE_VERSION "target-width-v1"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -383,8 +382,6 @@ static int hasLeftIntersection(unsigned int sensors)
         && (hasForwardPath(sensors) || hasRightPath(sensors));
 }
 
-static int activeSensorCount(unsigned int sensors);
-
 static int hasReturnIntersection(unsigned int sensors)
 {
     int branches = 0;
@@ -399,19 +396,6 @@ static int hasReturnIntersection(unsigned int sensors)
         branches++;
 
     return branches >= 2;
-}
-
-static int isStableLineForTarget(unsigned int sensors)
-{
-    int count;
-
-    sensors &= SENSOR_MASK;
-    count = activeSensorCount(sensors);
-
-    return count > 0
-        && count <= 3
-        && hasForwardPath(sensors)
-        && !hasLeftIntersection(sensors);
 }
 
 static int activeSensorCount(unsigned int sensors)
@@ -444,50 +428,44 @@ static int isTargetCandidate(unsigned int sensors)
         && (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2));
 }
 
-static int isSimilarTargetReading(unsigned int firstSensors, unsigned int sensors)
+static int isLineWidthReading(unsigned int sensors)
 {
-    unsigned int firstCore;
-    unsigned int currentCore;
-
-    firstSensors &= SENSOR_MASK;
     sensors &= SENSOR_MASK;
 
-    firstCore = firstSensors & (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
-    currentCore = sensors & (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
-
-    return isTargetCandidate(sensors)
-        && currentCore == firstCore;
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS
+        && hasForwardPath(sensors)
+        && ((sensors & (SENSOR_LEFT_1 | SENSOR_LEFT_2))
+            || (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2)));
 }
 
-static int confirmTarget(unsigned int firstSensors)
+static int measureLineWidthTicks(unsigned int firstSensors)
 {
-    int ticks;
-    int hits = 0;
+    int widthTicks = 0;
     unsigned int sensors = firstSensors & SENSOR_MASK;
 
-    printf("Target scan start sensors=");
+    printf("Line width scan start sensors=");
     printInt(firstSensors & SENSOR_MASK, 2 | 5 << 16);
     printf("\n");
 
-    setVel2(TARGET_SCAN_SPEED, TARGET_SCAN_SPEED);
-    for(ticks = 0; ticks < TARGET_CONFIRM_TICKS && !stopButton(); ticks++)
+    setVel2(LINE_WIDTH_SCAN_SPEED, LINE_WIDTH_SCAN_SPEED);
+    while(!stopButton()
+        && widthTicks < LINE_WIDTH_SCAN_MAX_TICKS
+        && isLineWidthReading(sensors))
     {
+        widthTicks++;
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
-
-        if(isSimilarTargetReading(firstSensors, sensors))
-            hits++;
     }
 
     setVel2(0, 0);
 
-    printf("Target scan hits=");
-    printInt(hits, 10);
+    printf("Line width ticks=");
+    printInt(widthTicks, 10);
     printf(" last=");
     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
     printf("\n");
 
-    return hits >= TARGET_CONFIRM_MIN_HITS;
+    return widthTicks;
 }
 
 static void driveForwardTicks(int ticks)
@@ -499,7 +477,7 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
-static void turnLeftToLine(void)
+static int turnLeftToLine(void)
 {
     int ticks = 0;
     unsigned int sensors = 0;
@@ -516,9 +494,13 @@ static void turnLeftToLine(void)
             && (sensors & SENSOR_CENTER)
             && !hasLeftIntersection(sensors))
         {
-            break;
+            setVel2(0, 0);
+            return 1;
         }
     }
+
+    setVel2(0, 0);
+    return 0;
 }
 
 static void turnRightToLine(void)
@@ -563,13 +545,6 @@ static void turnAroundToLine(void)
             break;
         }
     }
-}
-
-static void chooseLeftAtIntersection(void)
-{
-    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-    if(!stopButton())
-        turnLeftToLine();
 }
 
 static void executeReturnMove(char move)
@@ -661,8 +636,9 @@ int main(void)
     unsigned int sensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
-    int targetReadyTicks = 0;
     int targetFound = 0;
+    int lineWidthTicks = 0;
+    int candidateWasLeftIntersection = 0;
     RobotMode mode = MODE_IDLE;
 
     initPIC32();
@@ -683,7 +659,6 @@ int main(void)
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
-        targetReadyTicks = 0;
         targetFound = 0;
         resetPath();
         resetOptimizedPath();
@@ -696,7 +671,10 @@ int main(void)
 
             if(isTargetCandidate(sensors))
             {
-                if(targetReadyTicks >= TARGET_READY_TICKS && confirmTarget(sensors))
+                candidateWasLeftIntersection = hasLeftIntersection(sensors);
+                lineWidthTicks = measureLineWidthTicks(sensors);
+
+                if(lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
                 {
                     setVel2(0, 0);
                     leds(LED_TARGET_FOUND);
@@ -705,6 +683,8 @@ int main(void)
 
                     printf("Target confirmed sensors=");
                     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+                    printf(" width=");
+                    printInt(lineWidthTicks, 10);
                     printf("\n");
                     printPath();
                     optimizePath();
@@ -714,30 +694,80 @@ int main(void)
                     break;
                 }
 
-                printf("Target ignored/rejected ready=");
-                printInt(targetReadyTicks, 10);
+                printf("Line width ignored/rejected width=");
+                printInt(lineWidthTicks, 10);
                 printf(" sensors=");
                 printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
                 printf("\n");
-                sensors = readLineSensors(0);
-            }
 
-            if(isStableLineForTarget(sensors))
-            {
-                if(targetReadyTicks < TARGET_READY_TICKS)
-                    targetReadyTicks++;
-            }
-            else if(sensors == 0 || hasLeftIntersection(sensors))
-            {
-                targetReadyTicks = 0;
+                if(stopButton())
+                    break;
+
+                if(candidateWasLeftIntersection)
+                {
+                    leds(LED_INTERSECTION);
+                    printf("Intersection detected\n");
+                    printf("Executing left turn\n");
+                    if(turnLeftToLine())
+                    {
+                        printf("Left turn completed\n");
+                        recordMove('L');
+                        printf("Recorded move=L\n");
+                        lastDirection = -1;
+                    }
+                    else
+                    {
+                        printf("Left turn failed; move not recorded\n");
+                    }
+                    intersectionArmed = 0;
+                    leds(LED_EXPLORING);
+                    continue;
+                }
+
+                sensors = readLineSensors(0);
             }
 
             if(intersectionArmed && hasLeftIntersection(sensors))
             {
                 leds(LED_INTERSECTION);
-                recordMove('L');
-                chooseLeftAtIntersection();
-                lastDirection = -1;
+                printf("Intersection detected\n");
+                lineWidthTicks = measureLineWidthTicks(sensors);
+
+                if(lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
+                {
+                    setVel2(0, 0);
+                    leds(LED_TARGET_FOUND);
+                    targetFound = 1;
+                    mode = MODE_TARGET_FOUND;
+
+                    printf("Target confirmed at intersection sensors=");
+                    printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
+                    printf(" width=");
+                    printInt(lineWidthTicks, 10);
+                    printf("\n");
+                    printPath();
+                    optimizePath();
+                    printOptimizedPath();
+                    buildReturnPath();
+                    printReturnPath();
+                    break;
+                }
+
+                if(!stopButton())
+                {
+                    printf("Executing left turn\n");
+                    if(turnLeftToLine())
+                    {
+                        printf("Left turn completed\n");
+                        recordMove('L');
+                        printf("Recorded move=L\n");
+                        lastDirection = -1;
+                    }
+                    else
+                    {
+                        printf("Left turn failed; move not recorded\n");
+                    }
+                }
                 intersectionArmed = 0;
                 leds(LED_EXPLORING);
             }
