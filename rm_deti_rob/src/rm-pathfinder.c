@@ -1,4 +1,5 @@
 #include "rm-mr32.h"
+#include <math.h>
 #include <stdio.h>
 
 #define BASE_SPEED 45
@@ -18,7 +19,16 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 12
 #define LINE_WIDTH_SCAN_SPEED 15
-#define CODE_VERSION "intersection-width-v1"
+#define INTERSECTION_CLEAR_TICKS 5
+#define INTERSECTION_CLEAR_MAX_TICKS 120
+#define INTERSECTION_CLEAR_MIN_MM 70.0
+#define LEFT_TURN_MIN_RAD 1.15
+#define LEFT_TURN_MAX_RAD 2.20
+#define RIGHT_TURN_MIN_RAD 1.15
+#define RIGHT_TURN_MAX_RAD 2.20
+#define TURN_AROUND_MIN_RAD 2.70
+#define TURN_AROUND_MAX_RAD 3.70
+#define CODE_VERSION "encoder-guard-v1"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -284,6 +294,38 @@ static int clamp(int value, int minValue, int maxValue)
     return value;
 }
 
+static double absDouble(double value)
+{
+    if(value < 0.0)
+        return -value;
+    return value;
+}
+
+static double distanceFromPose(double startX, double startY)
+{
+    double x;
+    double y;
+    double theta;
+    double dx;
+    double dy;
+
+    getRobotPos(&x, &y, &theta);
+    dx = x - startX;
+    dy = y - startY;
+
+    return sqrt(dx * dx + dy * dy);
+}
+
+static double angleFromHeading(double startTheta)
+{
+    double x;
+    double y;
+    double theta;
+
+    getRobotPos(&x, &y, &theta);
+    return absDouble(normalizeAngle(theta - startTheta));
+}
+
 static int lineError(unsigned int sensors)
 {
     int weightedSum = 0;
@@ -418,6 +460,15 @@ static int activeSensorCount(unsigned int sensors)
     return count;
 }
 
+static int isNormalLine(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return sensors == SENSOR_CENTER
+        || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER)
+        || sensors == (SENSOR_CENTER | SENSOR_RIGHT_1);
+}
+
 static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
@@ -467,20 +518,71 @@ static void driveForwardTicks(int ticks)
         waitTick20ms();
 }
 
+static int waitUntilIntersectionCleared(int *lastDirection)
+{
+    int normalTicks = 0;
+    int totalTicks = 0;
+    unsigned int sensors;
+    double startX;
+    double startY;
+    double startTheta;
+    double clearDistance;
+
+    getRobotPos(&startX, &startY, &startTheta);
+
+    while(!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0);
+        followLine(sensors, lastDirection);
+        clearDistance = distanceFromPose(startX, startY);
+
+        if(clearDistance >= INTERSECTION_CLEAR_MIN_MM && isNormalLine(sensors))
+        {
+            normalTicks++;
+            if(normalTicks >= INTERSECTION_CLEAR_TICKS)
+            {
+                printf("Intersection cleared\n");
+                printf("Re-armed for next intersection\n");
+                return 1;
+            }
+        }
+        else
+        {
+            normalTicks = 0;
+        }
+
+        totalTicks++;
+    }
+
+    printf("Intersection clear timeout\n");
+    return 0;
+}
+
 static int turnLeftToLine(void)
 {
     int ticks = 0;
     unsigned int sensors = 0;
+    double x;
+    double y;
+    double startTheta;
+    double turnAngle;
+
+    getRobotPos(&x, &y, &startTheta);
 
     setVel2(-TURN_SPEED, TURN_SPEED);
 
-    while(!stopButton() && ticks < LEFT_TURN_MAX_TICKS)
+    while(!stopButton()
+        && ticks < LEFT_TURN_MAX_TICKS
+        && angleFromHeading(startTheta) < LEFT_TURN_MAX_RAD)
     {
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
+        turnAngle = angleFromHeading(startTheta);
 
-        if(ticks >= LEFT_TURN_MIN_TICKS
+        if(turnAngle >= LEFT_TURN_MIN_RAD
+            && ticks >= LEFT_TURN_MIN_TICKS
             && (sensors & SENSOR_CENTER)
             && !hasLeftIntersection(sensors))
         {
@@ -497,16 +599,26 @@ static void turnRightToLine(void)
 {
     int ticks = 0;
     unsigned int sensors = 0;
+    double x;
+    double y;
+    double startTheta;
+    double turnAngle;
+
+    getRobotPos(&x, &y, &startTheta);
 
     setVel2(TURN_SPEED, -TURN_SPEED);
 
-    while(!stopButton() && ticks < RIGHT_TURN_MAX_TICKS)
+    while(!stopButton()
+        && ticks < RIGHT_TURN_MAX_TICKS
+        && angleFromHeading(startTheta) < RIGHT_TURN_MAX_RAD)
     {
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
+        turnAngle = angleFromHeading(startTheta);
 
-        if(ticks >= RIGHT_TURN_MIN_TICKS
+        if(turnAngle >= RIGHT_TURN_MIN_RAD
+            && ticks >= RIGHT_TURN_MIN_TICKS
             && (sensors & SENSOR_CENTER)
             && !hasReturnIntersection(sensors))
         {
@@ -519,16 +631,26 @@ static void turnAroundToLine(void)
 {
     int ticks = 0;
     unsigned int sensors = 0;
+    double x;
+    double y;
+    double startTheta;
+    double turnAngle;
+
+    getRobotPos(&x, &y, &startTheta);
 
     setVel2(TURN_SPEED, -TURN_SPEED);
 
-    while(!stopButton() && ticks < TURN_AROUND_MAX_TICKS)
+    while(!stopButton()
+        && ticks < TURN_AROUND_MAX_TICKS
+        && angleFromHeading(startTheta) < TURN_AROUND_MAX_RAD)
     {
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
+        turnAngle = angleFromHeading(startTheta);
 
-        if(ticks >= TURN_AROUND_MIN_TICKS
+        if(turnAngle >= TURN_AROUND_MIN_RAD
+            && ticks >= TURN_AROUND_MIN_TICKS
             && (sensors & SENSOR_CENTER)
             && !hasReturnIntersection(sensors))
         {
@@ -569,7 +691,7 @@ static int runReturnNavigation(void)
     printf("Return navigation starting\n");
 
     turnAroundToLine();
-    intersectionArmed = 0;
+    intersectionArmed = waitUntilIntersectionCleared(&lastDirection);
 
     while(!stopButton())
     {
@@ -589,15 +711,12 @@ static int runReturnNavigation(void)
             leds(LED_INTERSECTION);
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
-            intersectionArmed = 0;
+            intersectionArmed = waitUntilIntersectionCleared(&lastDirection);
             leds(LED_EXPLORING | LED_TARGET_FOUND);
         }
         else
         {
             followLine(sensors, &lastDirection);
-
-            if(!hasReturnIntersection(sensors))
-                intersectionArmed = 1;
         }
     }
 
@@ -644,6 +763,7 @@ int main(void)
         printf("Press start to run\n");
         while(!startButton());
 
+        setRobotPos(0.0, 0.0, 0.0);
         mode = MODE_EXPLORE;
         leds(LED_EXPLORING);
         lastDirection = 1;
@@ -698,16 +818,13 @@ int main(void)
                     {
                         printf("Left turn failed; move not recorded\n");
                     }
+                    intersectionArmed = waitUntilIntersectionCleared(&lastDirection);
                 }
-                intersectionArmed = 0;
                 leds(LED_EXPLORING);
             }
             else
             {
                 followLine(sensors, &lastDirection);
-
-                if(!hasLeftIntersection(sensors))
-                    intersectionArmed = 1;
             }
         }
 
