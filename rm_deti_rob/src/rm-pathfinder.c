@@ -1,7 +1,6 @@
 #include "rm-mr32.h"
-#include <stdio.h>
 
-#define BASE_SPEED 45
+#define BASE_SPEED 40
 #define TURN_GAIN 7
 #define SEARCH_SPEED 25
 #define TURN_SPEED 35
@@ -16,19 +15,19 @@
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 18
-#define TARGET_BACKUP_MAX_TICKS 0
+#define TARGET_WIDTH_MIN_TICKS 16
+#define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
-#define LOST_LINE_DEAD_END_TICKS 10
-#define START_REACHED_RADIUS_MM 80
+#define LOST_LINE_DEAD_END_TICKS 16
+#define START_REACHED_RADIUS_MM 150
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v11-start-target-fix"
+#define CODE_VERSION "probe-target-v12-target-detection-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -383,13 +382,6 @@ static int hasRightPath(unsigned int sensors)
     return (sensors & RIGHT_BRANCH) != 0;
 }
 
-static int hasLeftIntersection(unsigned int sensors)
-{
-    sensors &= SENSOR_MASK;
-
-    return hasLeftPath(sensors) && (hasForwardPath(sensors) || hasRightPath(sensors));
-}
-
 static int isNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection, int detectTarget);
@@ -458,11 +450,11 @@ static int isIntersectionCandidate(unsigned int sensors)
     if (isNormalLine(sensors))
         return 0;
 
-    if (hasReturnIntersection(sensors))
-        return 1;
+    if (activeSensorCount(sensors) < TARGET_MIN_BLACK_SENSORS)
+        return 0;
 
-    if (hasLeftPath(sensors) || hasRightPath(sensors))
-        return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS;
+    if (hasLeftPath(sensors) || hasRightPath(sensors) || hasForwardPath(sensors))
+        return 1;
 
     return 0;
 }
