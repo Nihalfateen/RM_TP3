@@ -73,7 +73,7 @@ Options:
 1. Test `rm-pathfinder.c` on the real robot.
 2. Tune `BASE_SPEED`, `TURN_GAIN`, `SEARCH_SPEED`, and `TURN_SPEED`.
 3. Confirm the bit order of the five ground sensors.
-4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target.
+4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target. The current value is `14`.
 5. Tune `TARGET_BACKUP_MAX_TICKS` if the robot confirms the target but stops slightly after or before it.
 6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
