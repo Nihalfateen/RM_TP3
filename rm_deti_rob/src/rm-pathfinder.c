@@ -3,23 +3,23 @@
 #define BASE_SPEED 40
 #define TURN_GAIN 7
 #define SEARCH_SPEED 25
-#define TURN_SPEED 40
+#define TURN_SPEED 40 
 #define INTERSECTION_SPEED 30
 
-#define INTERSECTION_APPROACH_TICKS 12 // Increased for better alignment
+#define INTERSECTION_APPROACH_TICKS 8 
 #define LEFT_TURN_MIN_TICKS 8
-#define LEFT_TURN_MAX_TICKS 100 // Doubled timeout for safety
+#define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
-#define RIGHT_TURN_MAX_TICKS 100 // Doubled timeout for safety
+#define RIGHT_TURN_MAX_TICKS 50
 #define TURN_AROUND_MIN_TICKS 20
-#define TURN_AROUND_MAX_TICKS 150 // Increased for safety
+#define TURN_AROUND_MAX_TICKS 80
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 14
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
-#define INTERSECTION_CLEAR_TICKS 4
-#define INTERSECTION_CLEAR_MAX_TICKS 120
+#define INTERSECTION_CLEAR_TICKS 4 
+#define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
@@ -28,7 +28,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v16-robust-turns"
+#define CODE_VERSION "probe-target-v15-stuck-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -423,6 +423,7 @@ static int isNormalLine(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
+    // Made more robust: any clean center-focused reading counts
     if (sensors == SENSOR_CENTER)
         return 1;
     if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER))
@@ -648,8 +649,8 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         waitTick20ms();
         sensors = readLineSensors(0);
 
-        // Increased "blind" period to 10 ticks (200ms) to ensure it clears the intersection
-        if (detectTarget && totalTicks > 10 && probeTarget(sensors, "while clearing intersection"))
+        // Don't probe for target immediately to avoid getting stuck on the same intersection
+        if (detectTarget && totalTicks > 5 && probeTarget(sensors, "while clearing intersection"))
         {
             return 2;
         }
@@ -682,16 +683,15 @@ static int turnLeftToLine(void)
     int ticks = 0;
     unsigned int sensors = 0;
 
-    // Move forward slightly to align the wheels with the intersection center
-    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-
     setVel2(-TURN_SPEED, TURN_SPEED);
+
     while (!stopButton() && ticks < LEFT_TURN_MAX_TICKS)
     {
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
+        // Look for the center sensor to re-acquire the line
         if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
             setVel2(0, 0);
@@ -708,9 +708,8 @@ static void turnRightToLine(void)
     int ticks = 0;
     unsigned int sensors = 0;
 
-    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-
     setVel2(TURN_SPEED, -TURN_SPEED);
+
     while (!stopButton() && ticks < RIGHT_TURN_MAX_TICKS)
     {
         waitTick20ms();
@@ -732,6 +731,7 @@ static void turnAroundToLine(void)
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
+
     while (!stopButton() && ticks < TURN_AROUND_MAX_TICKS)
     {
         waitTick20ms();
@@ -758,7 +758,7 @@ static void executeReturnMove(char move)
     else if (move == 'B')
         turnAroundToLine();
     else if (move == 'S')
-        driveForwardTicks(INTERSECTION_APPROACH_TICKS * 2); // Double for straight to clear cross
+        driveForwardTicks(INTERSECTION_APPROACH_TICKS);
 }
 
 static int executeExplorationMove(char move)
@@ -779,7 +779,7 @@ static int executeExplorationMove(char move)
     }
     if (move == 'S')
     {
-        driveForwardTicks(INTERSECTION_APPROACH_TICKS * 2);
+        driveForwardTicks(INTERSECTION_APPROACH_TICKS);
         return 1;
     }
 
