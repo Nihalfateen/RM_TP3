@@ -13,21 +13,23 @@
 #define RIGHT_TURN_MAX_TICKS 45
 #define TURN_AROUND_MIN_TICKS 18
 #define TURN_AROUND_MAX_TICKS 75
+#define INTERSECTION_MIN_BLACK_SENSORS 2
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 16
+#define TARGET_WIDTH_MIN_TICKS 14
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
-#define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
-#define START_REACHED_RADIUS_MM 150
+#define START_REACHED_RADIUS_MM 100
+#define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v12-target-detection-fix"
+#define TURN_LINE_CONFIRM_TICKS 2
+#define CODE_VERSION "probe-target-v14-branch-target-return"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -156,17 +158,6 @@ static void simplifyOptimizedPathEnd(void)
     optimizedPath[optimizedPathLength] = replacement;
     optimizedPathLength++;
     optimizedPath[optimizedPathLength] = '\0';
-}
-
-static void stripTrailingBacktracks(void)
-{
-    while (optimizedPathLength > 0 &&
-           optimizedPath[optimizedPathLength - 1] == 'B')
-    {
-        optimizedPathLength--;
-        optimizedPath[optimizedPathLength] = '\0';
-        printf("Stripped trailing B from optimized path\n");
-    }
 }
 
 static void appendOptimizedMove(char move)
@@ -436,21 +427,28 @@ static int isNormalLine(unsigned int sensors)
     return sensors == SENSOR_CENTER || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER) || sensors == (SENSOR_CENTER | SENSOR_RIGHT_1) || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
 }
 
+static int isTurnCompletionLine(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    return sensors == SENSOR_CENTER || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER) || sensors == (SENSOR_CENTER | SENSOR_RIGHT_1);
+}
+
 static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && (hasLeftPath(sensors) || hasRightPath(sensors));
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && hasLeftPath(sensors) && hasRightPath(sensors);
 }
 
 static int isIntersectionCandidate(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    if (isNormalLine(sensors))
+    if (sensors == SENSOR_CENTER)
         return 0;
 
-    if (activeSensorCount(sensors) < TARGET_MIN_BLACK_SENSORS)
+    if (activeSensorCount(sensors) < INTERSECTION_MIN_BLACK_SENSORS)
         return 0;
 
     if (hasLeftPath(sensors) || hasRightPath(sensors) || hasForwardPath(sensors))
@@ -513,7 +511,6 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     printCurrentPose("Target pose");
     printPath();
     optimizePath();
-    stripTrailingBacktracks();
     printOptimizedPath();
     buildReturnPath();
     printReturnPath();
@@ -528,7 +525,10 @@ static int probeTarget(unsigned int sensors, char *source)
 
     widthTicks = measureLineWidthTicks(sensors);
     if (widthTicks < TARGET_WIDTH_MIN_TICKS)
+    {
+        driveBackwardTicks(clamp(widthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
         return 0;
+    }
 
     driveBackwardTicks(clamp(widthTicks / 4, 0, TARGET_BACKUP_MAX_TICKS));
     confirmTarget(sensors, widthTicks, source);
@@ -594,13 +594,6 @@ static int followLineUntilStartPose(int *lastDirection)
 
     while (!stopButton() && ticks < RETURN_START_SEARCH_MAX_TICKS)
     {
-        if (isNearStartPose())
-        {
-            printCurrentPose("Stopping at");
-            setVel2(0, 0);
-            return 1;
-        }
-
         waitTick20ms();
         sensors = readLineSensors(0);
 
@@ -609,14 +602,24 @@ static int followLineUntilStartPose(int *lastDirection)
             lostLineTicks++;
             if (lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
             {
-                printCurrentPose("Stopping at start line end");
-                setVel2(0, 0);
-                return 1;
+                if (ticks >= RETURN_START_MIN_TICKS && isNearStartPose())
+                {
+                    printCurrentPose("Stopping at start line end");
+                    setVel2(0, 0);
+                    return 1;
+                }
             }
         }
         else
         {
             lostLineTicks = 0;
+        }
+
+        if (ticks >= RETURN_START_MIN_TICKS && isNearStartPose())
+        {
+            printCurrentPose("Stopping at");
+            setVel2(0, 0);
+            return 1;
         }
 
         if (isReturnIntersectionCandidate(sensors))
@@ -640,6 +643,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 {
     int normalTicks = 0;
     int totalTicks = 0;
+    int seenNormal = 0;
     unsigned int sensors;
 
     while (!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
@@ -652,10 +656,15 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
             return 2;
         }
 
-        followLine(sensors, lastDirection);
+        if (seenNormal && isIntersectionCandidate(sensors))
+        {
+            printf("Next intersection reached while clearing\n");
+            return 1;
+        }
 
         if (isNormalLine(sensors))
         {
+            seenNormal = 1;
             normalTicks++;
             if (normalTicks >= INTERSECTION_CLEAR_TICKS)
             {
@@ -669,6 +678,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
             normalTicks = 0;
         }
 
+        followLine(sensors, lastDirection);
         totalTicks++;
     }
 
@@ -680,6 +690,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 static int turnLeftToLine(void)
 {
     int ticks = 0;
+    int lineTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(-TURN_SPEED, TURN_SPEED);
@@ -690,10 +701,18 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        if (ticks >= LEFT_TURN_MIN_TICKS && isTurnCompletionLine(sensors))
         {
-            setVel2(0, 0);
-            return 1;
+            lineTicks++;
+            if (lineTicks >= TURN_LINE_CONFIRM_TICKS)
+            {
+                setVel2(0, 0);
+                return 1;
+            }
+        }
+        else
+        {
+            lineTicks = 0;
         }
     }
 
@@ -704,6 +723,7 @@ static int turnLeftToLine(void)
 static void turnRightToLine(void)
 {
     int ticks = 0;
+    int lineTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -714,9 +734,15 @@ static void turnRightToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        if (ticks >= RIGHT_TURN_MIN_TICKS && isTurnCompletionLine(sensors))
         {
-            break;
+            lineTicks++;
+            if (lineTicks >= TURN_LINE_CONFIRM_TICKS)
+                break;
+        }
+        else
+        {
+            lineTicks = 0;
         }
     }
 
@@ -726,6 +752,7 @@ static void turnRightToLine(void)
 static void turnAroundToLine(void)
 {
     int ticks = 0;
+    int lineTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -736,9 +763,15 @@ static void turnAroundToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        if (ticks >= TURN_AROUND_MIN_TICKS && isTurnCompletionLine(sensors))
         {
-            break;
+            lineTicks++;
+            if (lineTicks >= TURN_LINE_CONFIRM_TICKS)
+                break;
+        }
+        else
+        {
+            lineTicks = 0;
         }
     }
 
@@ -797,7 +830,9 @@ static int runReturnNavigation(void)
     unsigned int returnIndex = 0;
     int lastDirection = 1;
     int intersectionArmed = 1;
-    int returnCandidateTicks = 0;
+    int returnSampleTicks = 0;
+    int returnHistory = 0;
+    int returnHitTicks = 0;
     int completed = 0;
 
     leds(LED_EXPLORING | LED_TARGET_FOUND);
@@ -822,15 +857,37 @@ static int runReturnNavigation(void)
             break;
         }
 
-        if (intersectionArmed && isReturnIntersectionCandidate(sensors))
-            returnCandidateTicks++;
-        else
-            returnCandidateTicks = 0;
+        if (intersectionArmed)
+        {
+            returnHistory <<= 1;
+            if (isReturnIntersectionCandidate(sensors))
+                returnHistory |= 1;
+            returnHistory &= 0x07;
 
-        if (intersectionArmed && returnCandidateTicks >= RETURN_INTERSECTION_DETECT_TICKS)
+            if (returnSampleTicks < INTERSECTION_DEBOUNCE_SAMPLES)
+                returnSampleTicks++;
+
+            returnHitTicks = 0;
+            if (returnHistory & 0x01)
+                returnHitTicks++;
+            if (returnHistory & 0x02)
+                returnHitTicks++;
+            if (returnHistory & 0x04)
+                returnHitTicks++;
+        }
+        else
+        {
+            returnSampleTicks = 0;
+            returnHistory = 0;
+            returnHitTicks = 0;
+        }
+
+        if (intersectionArmed && returnSampleTicks >= INTERSECTION_DEBOUNCE_MIN_HITS && returnHitTicks >= INTERSECTION_DEBOUNCE_MIN_HITS)
         {
             leds(LED_INTERSECTION);
-            returnCandidateTicks = 0;
+            returnSampleTicks = 0;
+            returnHistory = 0;
+            returnHitTicks = 0;
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
             intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
@@ -914,13 +971,6 @@ int main(void)
             waitTick20ms();
             sensors = readLineSensors(0);
 
-            if (probeTarget(sensors, "early probe"))
-            {
-                targetFound = 1;
-                mode = MODE_TARGET_FOUND;
-                break;
-            }
-
             if ((sensors & SENSOR_MASK) == 0)
                 lostLineTicks++;
             else
@@ -991,6 +1041,9 @@ int main(void)
                                       "at intersection");
                         break;
                     }
+
+                    driveBackwardTicks(clamp(lineWidthTicks / 2,
+                                             0, TARGET_BACKUP_MAX_TICKS));
 
                     if (!stopButton())
                     {
