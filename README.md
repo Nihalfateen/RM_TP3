@@ -2,6 +2,12 @@
 
 This repository contains the Assignment 2 work for the Mobile Robotics Path Finder Robot.
 
+## Goal
+
+Develop an autonomous line-following robot that explores an unknown maze with a left-hand navigation strategy, detects intersections and dead ends, identifies the target area through line-width analysis, and returns to the starting position.
+
+The robot records executed movements (`L`, `S`, `R`, and `B`) while exploring, uses those moves to build a topological representation of the path, optimizes the recorded route by removing unnecessary backtracking, computes the return path, and navigates back autonomously. Encoder odometry maintains an estimated pose so the robot can monitor its movement and improve return-to-start stopping behavior.
+
 ## Project Files
 
 - `prd.md`: product requirements document for the assignment.
@@ -73,8 +79,9 @@ Options:
 1. Test `rm-pathfinder.c` on the real robot.
 2. Tune `BASE_SPEED`, `TURN_GAIN`, `SEARCH_SPEED`, and `TURN_SPEED`.
 3. Confirm the bit order of the five ground sensors.
-4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target. The current value is `14`.
-5. Tune `TARGET_BACKUP_MAX_TICKS` if the robot confirms the target but stops slightly after or before it.
+4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target. The current value is `18`.
+5. Tune `TARGET_BACKUP_MAX_TICKS` if the robot confirms the target but stops slightly after it. The current value is `0`.
 6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
-8. Run and record the three required demo runs.
+8. Tune `RETURN_START_LOST_LINE_TICKS` if the robot reaches the start line end but stops too early or too late.
+9. Run and record the three required demo runs.

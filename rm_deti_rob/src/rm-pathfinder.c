@@ -16,8 +16,8 @@
 #define TURN_AROUND_MAX_TICKS 75
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 14
-#define TARGET_BACKUP_MAX_TICKS 4
+#define TARGET_WIDTH_MIN_TICKS 18
+#define TARGET_BACKUP_MAX_TICKS 0
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 5
 #define INTERSECTION_CLEAR_MAX_TICKS 120
@@ -26,8 +26,9 @@
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 10
 #define START_REACHED_RADIUS_MM 80
+#define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v10-tuned-stop"
+#define CODE_VERSION "probe-target-v11-start-target-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -447,7 +448,7 @@ static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && ((sensors & (SENSOR_LEFT_1 | SENSOR_LEFT_2)) || (sensors & (SENSOR_RIGHT_1 | SENSOR_RIGHT_2)));
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && (hasLeftPath(sensors) || hasRightPath(sensors));
 }
 
 static int isIntersectionCandidate(unsigned int sensors)
@@ -596,6 +597,7 @@ static int isNearStartPose(void)
 static int followLineUntilStartPose(int *lastDirection)
 {
     int ticks = 0;
+    int lostLineTicks = 0;
     unsigned int sensors;
 
     while (!stopButton() && ticks < RETURN_START_SEARCH_MAX_TICKS)
@@ -609,6 +611,21 @@ static int followLineUntilStartPose(int *lastDirection)
 
         waitTick20ms();
         sensors = readLineSensors(0);
+
+        if ((sensors & SENSOR_MASK) == 0)
+        {
+            lostLineTicks++;
+            if (lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
+            {
+                printCurrentPose("Stopping at start line end");
+                setVel2(0, 0);
+                return 1;
+            }
+        }
+        else
+        {
+            lostLineTicks = 0;
+        }
 
         if (isReturnIntersectionCandidate(sensors))
         {
