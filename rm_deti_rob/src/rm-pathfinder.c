@@ -3,23 +3,23 @@
 #define BASE_SPEED 40
 #define TURN_GAIN 7
 #define SEARCH_SPEED 25
-#define TURN_SPEED 35
+#define TURN_SPEED 40 // Increased slightly for more reliable turns
 #define INTERSECTION_SPEED 30
 
-#define INTERSECTION_APPROACH_TICKS 6
+#define INTERSECTION_APPROACH_TICKS 8 // Increased to move deeper into intersection
 #define LEFT_TURN_MIN_TICKS 8
-#define LEFT_TURN_MAX_TICKS 45
+#define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
-#define RIGHT_TURN_MAX_TICKS 45
-#define TURN_AROUND_MIN_TICKS 18
-#define TURN_AROUND_MAX_TICKS 75
+#define RIGHT_TURN_MAX_TICKS 50
+#define TURN_AROUND_MIN_TICKS 20
+#define TURN_AROUND_MAX_TICKS 80
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 14
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
-#define INTERSECTION_CLEAR_TICKS 5
-#define INTERSECTION_CLEAR_MAX_TICKS 120
+#define INTERSECTION_CLEAR_TICKS 4 // Slightly reduced to exit clearing state faster
+#define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
@@ -28,7 +28,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v14-fixed"
+#define CODE_VERSION "probe-target-v15-stuck-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -423,7 +423,17 @@ static int isNormalLine(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return sensors == SENSOR_CENTER || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER) || sensors == (SENSOR_CENTER | SENSOR_RIGHT_1) || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1);
+    // Made more robust: any clean center-focused reading counts
+    if (sensors == SENSOR_CENTER)
+        return 1;
+    if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER))
+        return 1;
+    if (sensors == (SENSOR_CENTER | SENSOR_RIGHT_1))
+        return 1;
+    if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1))
+        return 1;
+
+    return 0;
 }
 
 static int isLineWidthReading(unsigned int sensors)
@@ -639,7 +649,8 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         waitTick20ms();
         sensors = readLineSensors(0);
 
-        if (detectTarget && probeTarget(sensors, "while clearing intersection"))
+        // Don't probe for target immediately to avoid getting stuck on the same intersection
+        if (detectTarget && totalTicks > 5 && probeTarget(sensors, "while clearing intersection"))
         {
             return 2;
         }
@@ -652,7 +663,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
             if (normalTicks >= INTERSECTION_CLEAR_TICKS)
             {
                 printf("Intersection cleared\n");
-                printf("Re-armed for next intersection\n");
                 return 1;
             }
         }
@@ -665,7 +675,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
     }
 
     printf("Intersection clear timeout\n");
-    printf("Re-armed after timeout\n");
     return 1;
 }
 
@@ -682,7 +691,8 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        // Look for the center sensor to re-acquire the line
+        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
             setVel2(0, 0);
             return 1;
@@ -706,7 +716,7 @@ static void turnRightToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
             break;
         }
@@ -728,7 +738,7 @@ static void turnAroundToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
             break;
         }
@@ -749,8 +759,6 @@ static void executeReturnMove(char move)
         turnAroundToLine();
     else if (move == 'S')
         driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-    else
-        printf("Unsupported return move ignored: %c\n", move);
 }
 
 static int executeExplorationMove(char move)
@@ -775,7 +783,6 @@ static int executeExplorationMove(char move)
         return 1;
     }
 
-    printf("Unsupported exploration move ignored: %c\n", move);
     return 0;
 }
 
@@ -803,10 +810,6 @@ static int runReturnNavigation(void)
         {
             printf("Return decisions complete; searching start pose\n");
             completed = followLineUntilStartPose(&lastDirection);
-            if (completed)
-                printf("Return path complete; odometry start reached\n");
-            else
-                printf("Return path complete; odometry start not reached\n");
             break;
         }
 
@@ -917,7 +920,6 @@ int main(void)
                     printf("[ERROR] Path memory overflow - map too large\n");
                     break;
                 }
-                printf("Backtracking from dead end\n");
                 turnAroundToLine();
                 lastDirection = 1;
                 clearResult = waitUntilNormalLine(&lastDirection, 1);
@@ -981,7 +983,6 @@ int main(void)
                             }
                         }
 
-                        printf("Exploration move completed\n");
                         recordMove(chosenMove);
                         if (pathOverflow)
                         {
@@ -989,12 +990,12 @@ int main(void)
                             printf("[ERROR] Path memory overflow - map too large\n");
                             break;
                         }
-                        printf("Recorded move=");
-                        printf("%c\n", chosenMove);
+
                         if (chosenMove == 'L')
                             lastDirection = -1;
                         else if (chosenMove == 'R')
                             lastDirection = 1;
+
                         clearResult = waitUntilNormalLine(&lastDirection, 1);
                         if (clearResult == 2)
                         {
@@ -1028,14 +1029,6 @@ int main(void)
                     leds(LED_TARGET_FOUND);
                     printf("Finished; press stop to reset\n");
                 }
-                else
-                {
-                    printf("Return interrupted by stop button\n");
-                }
-            }
-            else
-            {
-                printf("Reset requested at target\n");
             }
 
             while (!stopButton())
