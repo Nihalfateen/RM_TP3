@@ -82,6 +82,101 @@ Options:
 4. Tune `TARGET_WIDTH_MIN_TICKS` so intersections are not confused with the target. The current value is `18`.
 5. Tune `TARGET_BACKUP_MAX_TICKS` if the robot confirms the target but stops slightly after it. The current value is `0`.
 6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
+
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
 8. Tune `RETURN_START_LOST_LINE_TICKS` if the robot reaches the start line end but stops too early or too late.
 9. Run and record the three required demo runs.
+Path Finder Robot - exploration left probe-target-v15-stuck-fix
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Line width ticks=1
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Exploration move failed; retrying
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Exploration move failed; retrying
+Exploration move: L
+Exploration move failed twice; stopping
+Press start to run
+
+
+
