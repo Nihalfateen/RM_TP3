@@ -974,12 +974,19 @@ int main(void)
                         chosenMove = chooseExplorationMove(junctionSensors);
                         if (!executeExplorationMove(chosenMove))
                         {
-                            printf("Exploration move failed; retrying\n");
-                            if (!executeExplorationMove(chosenMove))
+                            printf("Exploration move failed\n");
+                            if (chosenMove == 'L' && hasForwardPath(junctionSensors))
                             {
-                                setVel2(0, 0);
-                                printf("Exploration move failed twice; stopping\n");
-                                break;
+                                printf("Recovering from failed left; using straight\n");
+                                turnRightToLine();
+                                chosenMove = 'S';
+                                executeExplorationMove(chosenMove);
+                            }
+                            else
+                            {
+                                printf("Recovering with backtrack\n");
+                                chosenMove = 'B';
+                                executeExplorationMove(chosenMove);
                             }
                         }
 
@@ -990,6 +997,8 @@ int main(void)
                             printf("[ERROR] Path memory overflow - map too large\n");
                             break;
                         }
+                        printf("Recorded move=");
+                        printf("%c\n", chosenMove);
 
                         if (chosenMove == 'L')
                             lastDirection = -1;
