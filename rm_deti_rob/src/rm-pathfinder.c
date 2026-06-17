@@ -35,6 +35,7 @@
 #define LOST_LINE_DEAD_END_TICKS 16
 #define DEAD_END_LOCKOUT_TICKS 60
 #define DEAD_END_CONFIRM_RECOVERY_TICKS 35
+#define JUNCTION_CLEAR_RECOVERY_TICKS (JUNCTION_LOCKOUT_FAIL_TICKS - INTERSECTION_CLEAR_MAX_TICKS)
 #define START_REACHED_RADIUS_MM 100
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
@@ -80,6 +81,12 @@ typedef enum
     MODE_RETURN,
     MODE_FINISHED
 } RobotMode;
+
+typedef enum
+{
+    MAP_DECISION_IDLE,
+    MAP_DECISION_PENDING
+} MappingDecisionState;
 
 static void resetPath(void)
 {
@@ -388,6 +395,28 @@ static int isClearNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection, int detectTarget);
 
+static int commitPendingMove(MappingDecisionState *decisionState, char move)
+{
+    if (*decisionState != MAP_DECISION_PENDING)
+    {
+        printf("[WARN] Ignored move without pending junction decision\n");
+        return 1;
+    }
+
+    recordMove(move);
+    if (pathOverflow)
+    {
+        setVel2(0, 0);
+        printf("[ERROR] Path memory overflow - map too large\n");
+        return 0;
+    }
+
+    printf("Recorded move=");
+    printf("%c\n", move);
+    *decisionState = MAP_DECISION_IDLE;
+    return 1;
+}
+
 static int hasReturnIntersection(unsigned int sensors)
 {
     int branches = 0;
@@ -661,24 +690,45 @@ static int followLineUntilStartPose(int *lastDirection)
     return 0;
 }
 
-static int recoverLineBeforeDeadEnd(int *lastDirection)
+static int recoverStableNormalLine(int *lastDirection, int maxTicks, char *label)
 {
     int ticks;
+    int normalTicks = 0;
     unsigned int sensors;
 
-    for (ticks = 0; ticks < DEAD_END_CONFIRM_RECOVERY_TICKS && !stopButton(); ticks++)
+    printf("%s\n", label);
+
+    for (ticks = 0; ticks < maxTicks && !stopButton(); ticks++)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
-
-        if ((sensors & SENSOR_MASK) != 0)
-        {
-            followLine(sensors, lastDirection);
-            printf("Dead end ignored - line recovered\n");
-            return 1;
-        }
-
         followLine(sensors, lastDirection);
+
+        if (isClearNormalLine(sensors))
+        {
+            normalTicks++;
+            if (normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
+            {
+                printf("Stable line reacquired\n");
+                return 1;
+            }
+        }
+        else
+        {
+            normalTicks = 0;
+        }
+    }
+
+    setVel2(0, 0);
+    return 0;
+}
+
+static int recoverLineBeforeDeadEnd(int *lastDirection)
+{
+    if (recoverStableNormalLine(lastDirection, DEAD_END_CONFIRM_RECOVERY_TICKS, "Checking lost line before dead end"))
+    {
+        printf("Dead end ignored - line recovered\n");
+        return 1;
     }
 
     return 0;
@@ -688,12 +738,11 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 {
     int normalTicks = 0;
     int totalTicks = 0;
-    int reportedTimeout = 0;
     unsigned int sensors;
 
     (void)detectTarget;
 
-    while (!stopButton() && totalTicks < JUNCTION_LOCKOUT_FAIL_TICKS)
+    while (!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
@@ -715,12 +764,13 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         }
 
         totalTicks++;
+    }
 
-        if (!reportedTimeout && totalTicks >= INTERSECTION_CLEAR_MAX_TICKS)
-        {
-            printf("Intersection clear timeout; holding junction lockout\n");
-            reportedTimeout = 1;
-        }
+    printf("Intersection clear timeout; holding junction lockout\n");
+    if (recoverStableNormalLine(lastDirection, JUNCTION_CLEAR_RECOVERY_TICKS, "Junction clear recovery searching for stable line"))
+    {
+        printf("Intersection cleared\n");
+        return 1;
     }
 
     setVel2(0, 0);
@@ -948,6 +998,7 @@ int main(void)
     int rejectedRecoveryTicks = 0;
     int deadEndLockoutTicks = 0;
     char chosenMove = 'S';
+    MappingDecisionState mappingDecision = MAP_DECISION_IDLE;
     RobotMode mode = MODE_IDLE;
 
     initPIC32();
@@ -978,6 +1029,7 @@ int main(void)
         junctionCooldownTicks = 0;
         rejectedRecoveryTicks = 0;
         deadEndLockoutTicks = 0;
+        mappingDecision = MAP_DECISION_IDLE;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -1016,29 +1068,31 @@ int main(void)
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
                 lostLineTicks = 0;
+                mappingDecision = MAP_DECISION_PENDING;
                 if (!turnAroundSearchToLine())
                 {
+                    mappingDecision = MAP_DECISION_IDLE;
                     setVel2(0, 0);
                     printf("[ERROR] Dead end search failed - line not reacquired\n");
                     break;
                 }
 
-                recordMove('B');
-                if (pathOverflow)
-                {
-                    setVel2(0, 0);
-                    printf("[ERROR] Path memory overflow - map too large\n");
-                    break;
-                }
                 lastDirection = 1;
                 clearResult = waitUntilNormalLine(&lastDirection, 1);
                 if (clearResult == 2)
                 {
+                    if (!commitPendingMove(&mappingDecision, 'B'))
+                        break;
                     targetFound = 1;
                     mode = MODE_TARGET_FOUND;
                     break;
                 }
                 if (!clearResult)
+                {
+                    mappingDecision = MAP_DECISION_IDLE;
+                    break;
+                }
+                if (!commitPendingMove(&mappingDecision, 'B'))
                     break;
                 intersectionArmed = clearResult;
                 junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
@@ -1080,8 +1134,7 @@ int main(void)
                         rejectedRecoveryTicks = REJECTED_INTERSECTION_RECOVERY_TICKS;
                         deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
                         lostLineTicks = 0;
-                        sensors = readLineSensors(0);
-                        followLine(sensors, &lastDirection);
+                        recoverStableNormalLine(&lastDirection, REJECTED_INTERSECTION_RECOVERY_TICKS, "Rejected intersection recovery");
                         continue;
                     }
 
@@ -1098,6 +1151,7 @@ int main(void)
 
                     if (!stopButton())
                     {
+                        mappingDecision = MAP_DECISION_PENDING;
                         chosenMove = chooseExplorationMove(junctionSensors);
                         if (!executeExplorationMove(chosenMove))
                         {
@@ -1127,20 +1181,11 @@ int main(void)
 
                         if (chosenMove == '\0')
                         {
+                            mappingDecision = MAP_DECISION_IDLE;
                             setVel2(0, 0);
                             printf("[ERROR] Exploration recovery failed - line not reacquired\n");
                             break;
                         }
-
-                        recordMove(chosenMove);
-                        if (pathOverflow)
-                        {
-                            setVel2(0, 0);
-                            printf("[ERROR] Path memory overflow - map too large\n");
-                            break;
-                        }
-                        printf("Recorded move=");
-                        printf("%c\n", chosenMove);
 
                         if (chosenMove == 'L')
                             lastDirection = -1;
@@ -1150,11 +1195,18 @@ int main(void)
                         clearResult = waitUntilNormalLine(&lastDirection, 1);
                         if (clearResult == 2)
                         {
+                            if (!commitPendingMove(&mappingDecision, chosenMove))
+                                break;
                             targetFound = 1;
                             mode = MODE_TARGET_FOUND;
                             break;
                         }
                         if (!clearResult)
+                        {
+                            mappingDecision = MAP_DECISION_IDLE;
+                            break;
+                        }
+                        if (!commitPendingMove(&mappingDecision, chosenMove))
                             break;
                         intersectionArmed = clearResult;
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
