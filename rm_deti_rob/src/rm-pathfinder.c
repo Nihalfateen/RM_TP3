@@ -20,6 +20,7 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 14
 #define TARGET_BACKUP_MAX_TICKS 6
+#define REJECTED_BACKUP_MIN_TICKS 1
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 6
 #define JUNCTION_LOCKOUT_MIN_TICKS 8
@@ -764,7 +765,7 @@ static int turnAroundToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (ticks >= TURN_AROUND_MIN_TICKS && isClearNormalLine(sensors))
         {
             setVel2(0, 0);
             return 1;
@@ -1013,6 +1014,7 @@ int main(void)
                         printf("Intersection rejected width=");
                         printInt(lineWidthTicks, 10);
                         printf("\n");
+                        driveBackwardTicks(clamp(lineWidthTicks, REJECTED_BACKUP_MIN_TICKS, TARGET_BACKUP_MAX_TICKS));
                         leds(LED_EXPLORING);
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                         rejectedRecoveryTicks = REJECTED_INTERSECTION_RECOVERY_TICKS;
