@@ -28,7 +28,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v22-clear-intersection"
+#define CODE_VERSION "probe-target-v23-stable-clear"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -436,13 +436,6 @@ static int isNormalLine(unsigned int sensors)
     return 0;
 }
 
-static int isClearLine(unsigned int sensors)
-{
-    sensors &= SENSOR_MASK;
-
-    return sensors == SENSOR_CENTER || sensors == (SENSOR_LEFT_1 | SENSOR_CENTER) || sensors == (SENSOR_CENTER | SENSOR_RIGHT_1);
-}
-
 static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
@@ -652,15 +645,9 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         waitTick20ms();
         sensors = readLineSensors(0);
 
-        // Don't probe for target immediately to avoid getting stuck on the same intersection
-        if (detectTarget && totalTicks > 5 && probeTarget(sensors, "while clearing intersection"))
-        {
-            return 2;
-        }
-
         followLine(sensors, lastDirection);
 
-        if (isClearLine(sensors))
+        if (isNormalLine(sensors))
         {
             normalTicks++;
             if (normalTicks >= INTERSECTION_CLEAR_TICKS)
