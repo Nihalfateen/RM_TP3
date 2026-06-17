@@ -100,117 +100,46 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=3
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
 Line width ticks=4
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=3
 Exploration move: L
 Recorded move=L
 Intersection clear timeout; holding junction lockout
-[ERROR] Junction lockout failed - stable line not reacquired
-Press start to run
-Start pose reset x=0 y=0 theta=0mrad
-Intersection detected
-Line width ticks=5
-Exploration move: L
-Recorded move=L
 Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Dead end detected
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
 Intersection detected
 Line width ticks=3
 Exploration move: L
 Recorded move=L
 Intersection cleared
 Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Intersection detected
-Line width ticks=6
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Intersection detected
-Line width ticks=30
-Target confirmed at intersection sensors=11111 width=30
-Target pose x=714 y=311 theta=21mrad
-Recorded path (6 moves): LLBBLB
-Optimized path (4 moves): LLLB
-Return path (4 moves): BRRR
-Target reached; press start for return or stop to reset
+[ERROR] Dead end turn failed - line not reacquired
+
 
 
 
