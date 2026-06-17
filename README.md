@@ -84,11 +84,11 @@ Options:
 6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
 
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
-Path Finder Robot - exploration left probe-target-v20-turn-entry-start-end
+Path Finder Robot - exploration left probe-target-v22-clear-intersection
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
-Line width ticks=3
+Line width ticks=5
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -103,59 +103,46 @@ Intersection detected
 Line width ticks=2
 Exploration move: L
 Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
 Line width ticks=6
-Exploration move: L
-Recorded move=L
+Line width ticks=2
+Intersection clear timeout
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
 Intersection cleared
 Dead end detected
 Intersection cleared
 Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Line width ticks=13
 Line width ticks=4
+Line width ticks=2
+Intersection cleared
+Intersection detected
+Line width ticks=1
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -165,19 +152,14 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
+Line width ticks=5
 Exploration move: L
 Recorded move=L
 Intersection cleared
 Dead end detected
 Intersection cleared
 Intersection detected
-Line width ticks=2
+Line width ticks=3
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -189,7 +171,7 @@ Intersection cleared
 Dead end detected
 Intersection cleared
 Intersection detected
-Line width ticks=2
+Line width ticks=1
 Exploration move: L
 Exploration move failed
 Recovering from failed left; using straight
@@ -197,7 +179,7 @@ Exploration move: S
 Recorded move=S
 Intersection cleared
 Intersection detected
-Line width ticks=6
+Line width ticks=5
 Exploration move: L
 Exploration move failed
 Recovering from failed left; using straight
@@ -205,7 +187,7 @@ Exploration move: S
 Recorded move=S
 Intersection cleared
 Intersection detected
-Line width ticks=1
+Line width ticks=2
 Exploration move: S
 Recorded move=S
 Intersection cleared
@@ -218,14 +200,12 @@ Intersection detected
 Line width ticks=4
 Exploration move: L
 Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=30
-Target confirmed at intersection sensors=11100 width=30
-Target pose x=707 y=218 theta=4294966509mrad
-Recorded path (27 moves): LLBLSSBLLSLLLBLLLLBLLBSSSSL
-Optimized path (17 moves): LSSRLSLLSLLSRSSSL
-Return path (17 moves): RSSSLSRRSRRSRLSSR
+Line width ticks=27
+Target confirmed while clearing intersection sensors=11100 width=27
+Target pose x=654 y=262 theta=4294966426mrad
+Recorded path (23 moves): LLBLSBLLSLLLLLBLLBSSSSL
+Optimized path (15 moves): LSRLSLLLLSRSSSL
+Return path (15 moves): RSSSLSRRRRSRLSR
 Target reached; press start for return or stop to reset
 Return navigation starting
 Intersection cleared
@@ -242,6 +222,10 @@ Intersection cleared
 Return move: S
 Intersection cleared
 Return move: R
+Intersection cleared
+Return move: R
+Intersection clear timeout
+Return move: R
 Intersection clear timeout
 Return move: R
 Intersection cleared
@@ -249,15 +233,7 @@ Return move: S
 Intersection cleared
 Return move: R
 Intersection cleared
-Return move: R
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection clear timeout
 Return move: L
-Intersection cleared
-Return move: S
 Intersection cleared
 Return move: S
 Intersection cleared
@@ -273,8 +249,380 @@ Intersection cleared
 Intersection cleared
 Intersection cleared
 Intersection cleared
+Start pose search timeout x=512 y=514 theta=4294966929mrad
+Press start to run
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
+Path Finder Robot - exploration left probe-target-v22-clear-intersection
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
 Intersection cleared
-Start pose search timeout x=717 y=394 theta=4294966195mrad
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Line width ticks=26
+Target confirmed while clearing intersection sensors=11100 width=26
+Target pose x=4294967129 y=4294967251 theta=2360mrad
+Recorded path (5 moves): SSSSL
+Optimized path (5 moves): SSSSL
+Return path (5 moves): RSSSS
+Target reached; press start for return or stop to reset
+Return navigation starting
+Intersection clear timeout
+Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection clear timeout
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return decisions complete; searching start pose
+Intersection clear timeout
+Intersection cleared
+Intersection cleared
+Intersection clear timeout
+Intersection cleared
+Intersection cleared
+Intersection clear timeout
+Intersection cleared
+Intersection cleared
+Intersection clear timeout
+Intersection cleared
+Start pose search timeout x=4294966786 y=4294967038 theta=4294965094mrad
+Press start to run
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
+Path Finder Robot - exploration left probe-target-v22-clear-intersection
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Line width ticks=29
+Target confirmed while clearing intersection sensors=11100 width=29
+Target pose x=4294967097 y=4294967238 theta=2369mrad
+Recorded path (5 moves): SSSSL
+Optimized path (5 moves): SSSSL
+Return path (5 moves): RSSSS
+Target reached; press start for return or stop to reset
+Return navigation starting
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return decisions complete; searching start pose
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Start pose search timeout x=257 y=4294967260 theta=434mrad
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Line width ticks=6
+Line width ticks=6
+Intersection clear timeout
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=7
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Line width ticks=25
+Target confirmed while clearing intersection sensors=11100 width=25
+Target pose x=9 y=4294967272 theta=374mrad
+Recorded path (35 moves): SSBLLBLSBLLLSSBLLSLLLBLLLLBLLBSSSSL
+Optimized path (21 moves): SRSRLLSRLSLLSLLSRSSSL
+Return path (21 moves): RSSSLSRRSRRSRLSRRLSLS
+Target reached; press start for return or stop to reset
+Return navigation starting
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: L
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: L
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: L
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: L
+Intersection cleared
+Return move: S
+Intersection cleared
+Return decisions complete; searching start pose
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Start pose search timeout x=4294967151 y=4294966908 theta=4294964264mrad
+
+
 
 
 
