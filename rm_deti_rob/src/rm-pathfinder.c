@@ -3,7 +3,7 @@
 #define BASE_SPEED 40
 #define TURN_GAIN 7
 #define SEARCH_SPEED 25
-#define TURN_SPEED 40 
+#define TURN_SPEED 35
 #define INTERSECTION_SPEED 30
 
 #define INTERSECTION_APPROACH_TICKS 8 
@@ -24,11 +24,11 @@
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
-#define START_REACHED_RADIUS_MM 100
-#define RETURN_START_MIN_TICKS 20
+#define START_REACHED_RADIUS_MM 350
+#define RETURN_START_MIN_TICKS 0
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v15-stuck-fix"
+#define CODE_VERSION "probe-target-v16-return-turn-stop"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -604,9 +604,12 @@ static int followLineUntilStartPose(int *lastDirection)
             lostLineTicks++;
             if (lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
             {
-                printCurrentPose("Stopping at start line end");
-                setVel2(0, 0);
-                return 1;
+                if (ticks >= RETURN_START_MIN_TICKS && isNearStartPose())
+                {
+                    printCurrentPose("Stopping at start line end");
+                    setVel2(0, 0);
+                    return 1;
+                }
             }
         }
         else
@@ -750,6 +753,10 @@ static void turnAroundToLine(void)
 static void executeReturnMove(char move)
 {
     printf("Return move: %c\n", move);
+
+    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
+    if (stopButton())
+        return;
 
     if (move == 'L')
         turnLeftToLine();
