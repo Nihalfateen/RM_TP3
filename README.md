@@ -100,33 +100,172 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Intersection detected
-Line width ticks=5
+Line width ticks=3
 Exploration move: L
 Recorded move=L
 Intersection cleared
+Intersection detected
+Line width ticks=0
+Intersection rejected width=0
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
 Dead end detected
-[ERROR] Dead end turn failed - line not reacquired
+Dead end turn searching for line
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Dead end turn searching for line
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=22
+Target confirmed at intersection sensors=11111 width=22
+Target pose x=816 y=330 theta=33mrad
+Recorded path (5 moves): LLBBS
+Optimized path (3 moves): LLS
+Return path (3 moves): SRR
+Target reached; press start for return or stop to reset
+Return navigation starting
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection clear timeout; holding junction lockout
+Intersection cleared
+Return move: R
+Intersection cleared
+Return decisions complete; searching start pose
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Start pose search timeout x=370 y=479 theta=1460mrad
 Press start to run
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
+Path Finder Robot - exploration left probe-target-v24-junction-lockout
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=30
+Target confirmed at intersection sensors=00111 width=30
+Target pose x=204 y=720 theta=1787mrad
+Recorded path (2 moves): LL
+Optimized path (2 moves): LL
+Return path (2 moves): RR
+Target reached; press start for return or stop to reset
+Return navigation starting
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: R
+Intersection cleared
+Return decisions complete; searching start pose
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Intersection cleared
+Stopping at start line end x=51 y=69 theta=2919mrad
+Finished; press stop to reset
+
+Goodbye!
+nihal@irislab-lt-05:~/RM_TP3-main/rm_deti_rob/src$ ldpic32 -w rm-pathfinder.hex
+
+DETPIC32 Serial Programmer, V0.5 (January, 2017)
+Universidade de Aveiro, DETI
+J.L.Azevedo (jla@ua.pt)
+
+File: rm-pathfinder.hex
+
+Programming: .................... 100%
+Verifying:   ... Success :)
+
+nihal@irislab-lt-05:~/RM_TP3-main/rm_deti_rob/src$ pterm
+
+DETPIC32 terminal emulator, V0.4 (January, 2017)
+Universidade de Aveiro, DETI
+TOS (tos@ua.pt)
+
+/dev/ttyUSB0: 115200,N,8,1
+
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
+Path Finder Robot - exploration left probe-target-v24-junction-lockout
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection clear timeout; holding junction lockout
+[ERROR] Junction lockout failed - stable line not reacquired
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection clear timeout; holding junction lockout
+[ERROR] Junction lockout failed - stable line not reacquired
+Press start to run
+
+
 
 
 
