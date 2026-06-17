@@ -9,13 +9,14 @@
 #define INTERSECTION_APPROACH_TICKS 8 
 #define INTERSECTION_CONFIRM_TICKS 4
 #define INTERSECTION_MIN_WIDTH_TICKS 3
-#define REJECTED_INTERSECTION_RECOVERY_TICKS 20
+#define REJECTED_INTERSECTION_RECOVERY_TICKS 30
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
 #define RIGHT_TURN_MAX_TICKS 50
 #define TURN_AROUND_MIN_TICKS 20
 #define TURN_AROUND_MAX_TICKS 80
+#define DEAD_END_TURN_SEARCH_TICKS 160
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 14
@@ -32,7 +33,8 @@
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
-#define DEAD_END_LOCKOUT_TICKS 40
+#define DEAD_END_LOCKOUT_TICKS 60
+#define DEAD_END_CONFIRM_RECOVERY_TICKS 35
 #define START_REACHED_RADIUS_MM 100
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
@@ -659,6 +661,29 @@ static int followLineUntilStartPose(int *lastDirection)
     return 0;
 }
 
+static int recoverLineBeforeDeadEnd(int *lastDirection)
+{
+    int ticks;
+    unsigned int sensors;
+
+    for (ticks = 0; ticks < DEAD_END_CONFIRM_RECOVERY_TICKS && !stopButton(); ticks++)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0);
+
+        if ((sensors & SENSOR_MASK) != 0)
+        {
+            followLine(sensors, lastDirection);
+            printf("Dead end ignored - line recovered\n");
+            return 1;
+        }
+
+        followLine(sensors, lastDirection);
+    }
+
+    return 0;
+}
+
 static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 {
     int normalTicks = 0;
@@ -766,6 +791,34 @@ static int turnAroundToLine(void)
         ticks++;
 
         if (ticks >= TURN_AROUND_MIN_TICKS && isClearNormalLine(sensors))
+        {
+            setVel2(0, 0);
+            return 1;
+        }
+    }
+
+    setVel2(0, 0);
+    return 0;
+}
+
+static int turnAroundSearchToLine(void)
+{
+    int ticks = 0;
+    unsigned int sensors = 0;
+
+    if (turnAroundToLine())
+        return 1;
+
+    printf("Dead end turn searching for line\n");
+    setVel2(TURN_SPEED, -TURN_SPEED);
+
+    while (!stopButton() && ticks < DEAD_END_TURN_SEARCH_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+        ticks++;
+
+        if (isClearNormalLine(sensors) || (sensors & SENSOR_CENTER))
         {
             setVel2(0, 0);
             return 1;
@@ -953,13 +1006,20 @@ int main(void)
 
             if (junctionCooldownTicks == 0 && rejectedRecoveryTicks == 0 && deadEndLockoutTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
+                if (recoverLineBeforeDeadEnd(&lastDirection))
+                {
+                    lostLineTicks = 0;
+                    deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
+                    continue;
+                }
+
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
                 lostLineTicks = 0;
-                if (!turnAroundToLine())
+                if (!turnAroundSearchToLine())
                 {
                     setVel2(0, 0);
-                    printf("[ERROR] Dead end turn failed - line not reacquired\n");
+                    printf("[ERROR] Dead end search failed - line not reacquired\n");
                     break;
                 }
 
