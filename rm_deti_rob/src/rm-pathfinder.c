@@ -31,6 +31,7 @@
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
+#define DEAD_END_LOCKOUT_TICKS 40
 #define START_REACHED_RADIUS_MM 100
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
@@ -891,6 +892,7 @@ int main(void)
     int clearResult = 1;
     int junctionCooldownTicks = 0;
     int rejectedRecoveryTicks = 0;
+    int deadEndLockoutTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -921,6 +923,7 @@ int main(void)
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
         rejectedRecoveryTicks = 0;
+        deadEndLockoutTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -941,11 +944,24 @@ int main(void)
                 lostLineTicks = 0;
             }
 
-            if (junctionCooldownTicks == 0 && rejectedRecoveryTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            if (deadEndLockoutTicks > 0)
+            {
+                deadEndLockoutTicks--;
+                lostLineTicks = 0;
+            }
+
+            if (junctionCooldownTicks == 0 && rejectedRecoveryTicks == 0 && deadEndLockoutTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
                 lostLineTicks = 0;
+                if (!turnAroundToLine())
+                {
+                    setVel2(0, 0);
+                    printf("[ERROR] Dead end turn failed - line not reacquired\n");
+                    break;
+                }
+
                 recordMove('B');
                 if (pathOverflow)
                 {
@@ -953,7 +969,6 @@ int main(void)
                     printf("[ERROR] Path memory overflow - map too large\n");
                     break;
                 }
-                turnAroundToLine();
                 lastDirection = 1;
                 clearResult = waitUntilNormalLine(&lastDirection, 1);
                 if (clearResult == 2)
@@ -966,6 +981,7 @@ int main(void)
                     break;
                 intersectionArmed = clearResult;
                 junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
                 leds(LED_EXPLORING);
                 continue;
             }
@@ -1000,6 +1016,7 @@ int main(void)
                         leds(LED_EXPLORING);
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                         rejectedRecoveryTicks = REJECTED_INTERSECTION_RECOVERY_TICKS;
+                        deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
                         lostLineTicks = 0;
                         sensors = readLineSensors(0);
                         followLine(sensors, &lastDirection);
@@ -1079,6 +1096,7 @@ int main(void)
                             break;
                         intersectionArmed = clearResult;
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                        deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
                     }
                     leds(LED_EXPLORING);
                     continue;
