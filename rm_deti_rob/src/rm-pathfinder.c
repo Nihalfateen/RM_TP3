@@ -6,10 +6,8 @@
 #define TURN_SPEED 40
 #define INTERSECTION_SPEED 30
 
-#define INTERSECTION_APPROACH_TICKS 8 
+#define INTERSECTION_APPROACH_TICKS 8
 #define INTERSECTION_CONFIRM_TICKS 4
-#define INTERSECTION_MIN_WIDTH_TICKS 3
-#define REJECTED_INTERSECTION_RECOVERY_TICKS 30
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
@@ -21,7 +19,6 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 14
 #define TARGET_BACKUP_MAX_TICKS 6
-#define REJECTED_BACKUP_MIN_TICKS 1
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 6
 #define JUNCTION_LOCKOUT_MIN_TICKS 8
@@ -31,7 +28,9 @@
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
-#define RETURN_INTERSECTION_DETECT_TICKS 3
+#define RETURN_INTERSECTION_DETECT_TICKS 4
+#define RETURN_JUNCTION_COOLDOWN_TICKS 12
+#define RETURN_MOVE_RECOVERY_TICKS 80
 #define LOST_LINE_DEAD_END_TICKS 16
 #define DEAD_END_LOCKOUT_TICKS 60
 #define DEAD_END_CONFIRM_RECOVERY_TICKS 35
@@ -40,7 +39,8 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v25-mapping-guard-no-centering"
+#define AUTO_RETURN_AFTER_TARGET 1
+#define CODE_VERSION "probe-target-v26-width-safe"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -87,6 +87,12 @@ typedef enum
     MAP_DECISION_IDLE,
     MAP_DECISION_PENDING
 } MappingDecisionState;
+
+typedef enum
+{
+    RETURN_DECISION_LOCKED,
+    RETURN_DECISION_ARMED
+} ReturnDecisionState;
 
 static void resetPath(void)
 {
@@ -393,6 +399,7 @@ static int hasRightPath(unsigned int sensors)
 static int isNormalLine(unsigned int sensors);
 static int isClearNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
+static int activeSensorCount(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection, int detectTarget);
 
 static int commitPendingMove(MappingDecisionState *decisionState, char move)
@@ -437,7 +444,13 @@ static int isReturnIntersectionCandidate(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return isIntersectionCandidate(sensors);
+    if (isNormalLine(sensors))
+        return 0;
+
+    if (activeSensorCount(sensors) < TARGET_MIN_BLACK_SENSORS)
+        return 0;
+
+    return hasReturnIntersection(sensors);
 }
 
 static int activeSensorCount(unsigned int sensors)
@@ -672,6 +685,13 @@ static int followLineUntilStartPose(int *lastDirection)
             lostLineTicks = 0;
         }
 
+        if (ticks >= RETURN_START_MIN_TICKS && isNearStartPose())
+        {
+            printCurrentPose("Stopping near start pose");
+            setVel2(0, 0);
+            return 1;
+        }
+
         if (isReturnIntersectionCandidate(sensors))
         {
             driveForwardTicks(INTERSECTION_APPROACH_TICKS);
@@ -740,12 +760,15 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
     int totalTicks = 0;
     unsigned int sensors;
 
-    (void)detectTarget;
-
     while (!stopButton() && totalTicks < INTERSECTION_CLEAR_MAX_TICKS)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
+
+        if (detectTarget && probeTarget(sensors, "while clearing intersection"))
+            return 2;
+        if (detectTarget)
+            sensors = readLineSensors(0);
 
         followLine(sensors, lastDirection);
 
@@ -879,18 +902,23 @@ static int turnAroundSearchToLine(void)
     return 0;
 }
 
-static void executeReturnMove(char move)
+static int executeReturnMove(char move)
 {
     printf("Return move: %c\n", move);
 
     if (move == 'L')
-        turnLeftToLine();
-    else if (move == 'R')
-        turnRightToLine();
-    else if (move == 'B')
-        turnAroundToLine();
-    else if (move == 'S')
+        return turnLeftToLine();
+    if (move == 'R')
+        return turnRightToLine();
+    if (move == 'B')
+        return turnAroundToLine();
+    if (move == 'S')
+    {
         driveForwardTicks(INTERSECTION_APPROACH_TICKS);
+        return 1;
+    }
+
+    return 0;
 }
 
 static int executeExplorationMove(char move)
@@ -915,19 +943,43 @@ static int executeExplorationMove(char move)
 static int runReturnNavigation(void)
 {
     unsigned int sensors;
+    unsigned int junctionSensors;
     unsigned int returnIndex = 0;
     int lastDirection = 1;
-    int intersectionArmed = 1;
+    ReturnDecisionState returnDecisionState = RETURN_DECISION_LOCKED;
     int returnCandidateTicks = 0;
+    int returnCooldownTicks = 0;
+    int lineWidthTicks = 0;
+    int moveCompleted = 0;
     int completed = 0;
 
     leds(LED_EXPLORING | LED_TARGET_FOUND);
     printf("Return navigation starting\n");
 
-    turnAroundToLine();
-    intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
-    if (!intersectionArmed)
-        return 0;
+    if (!turnAroundToLine())
+    {
+        printf("[WARN] Initial return turn failed; searching for line\n");
+        if (!recoverStableNormalLine(&lastDirection, RETURN_MOVE_RECOVERY_TICKS, "Initial return line recovery"))
+        {
+            printf("[ERROR] Return start failed - line not reacquired\n");
+            return 0;
+        }
+    }
+
+    if (!waitUntilNormalLine(&lastDirection, 0))
+    {
+        printf("[WARN] Return line reacquisition failed; trying bounded recovery\n");
+        if (!recoverStableNormalLine(&lastDirection, RETURN_MOVE_RECOVERY_TICKS, "Return reacquisition recovery"))
+        {
+            printf("[ERROR] Return start failed - stable line not reacquired\n");
+            return 0;
+        }
+    }
+
+    returnDecisionState = RETURN_DECISION_ARMED;
+
+    if (returnPathLength == 0)
+        printf("Return decisions complete; searching start pose\n");
 
     while (!stopButton())
     {
@@ -936,25 +988,73 @@ static int runReturnNavigation(void)
 
         if (returnIndex >= returnPathLength)
         {
-            printf("Return decisions complete; searching start pose\n");
+            if (returnPathLength != 0)
+                printf("Return decisions complete; searching start pose\n");
             completed = followLineUntilStartPose(&lastDirection);
             break;
         }
 
-        if (intersectionArmed && isReturnIntersectionCandidate(sensors))
+        if (returnCooldownTicks > 0)
+        {
+            returnCooldownTicks--;
+            returnCandidateTicks = 0;
+            followLine(sensors, &lastDirection);
+            continue;
+        }
+
+        if (returnDecisionState == RETURN_DECISION_ARMED && isReturnIntersectionCandidate(sensors))
             returnCandidateTicks++;
         else
             returnCandidateTicks = 0;
 
-        if (intersectionArmed && returnCandidateTicks >= RETURN_INTERSECTION_DETECT_TICKS)
+        if (returnDecisionState == RETURN_DECISION_ARMED && returnCandidateTicks >= RETURN_INTERSECTION_DETECT_TICKS)
         {
             leds(LED_INTERSECTION);
+            printf("Return candidate detected\n");
             returnCandidateTicks = 0;
-            executeReturnMove(returnPath[returnIndex]);
-            returnIndex++;
-            intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
-            if (!intersectionArmed)
+            junctionSensors = sensors & SENSOR_MASK;
+            lineWidthTicks = measureLineWidthTicks(junctionSensors);
+
+            driveBackwardTicks(clamp(lineWidthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
+            returnDecisionState = RETURN_DECISION_LOCKED;
+            moveCompleted = executeReturnMove(returnPath[returnIndex]);
+
+            if (!moveCompleted)
+            {
+                printf("[WARN] Return move failed; trying bounded recovery\n");
+                moveCompleted = recoverStableNormalLine(&lastDirection, RETURN_MOVE_RECOVERY_TICKS, "Return move recovery");
+            }
+
+            if (!moveCompleted)
+            {
+                setVel2(0, 0);
+                printf("[ERROR] Return move failed - move not consumed\n");
                 break;
+            }
+
+            printf("Return move completed\n");
+
+            if (!waitUntilNormalLine(&lastDirection, 0))
+            {
+                printf("[WARN] Return line reacquisition failed; trying bounded recovery\n");
+                if (!recoverStableNormalLine(&lastDirection, RETURN_MOVE_RECOVERY_TICKS, "Return line recovery"))
+                {
+                    setVel2(0, 0);
+                    printf("[ERROR] Return line reacquisition failed after move\n");
+                    break;
+                }
+                printf("Intersection cleared\n");
+            }
+
+            returnIndex++;
+            printf("Return index=");
+            printInt(returnIndex, 10);
+            printf("/");
+            printInt(returnPathLength, 10);
+            printf("\n");
+
+            returnDecisionState = RETURN_DECISION_ARMED;
+            returnCooldownTicks = RETURN_JUNCTION_COOLDOWN_TICKS;
             leds(LED_EXPLORING | LED_TARGET_FOUND);
         }
         else
@@ -964,6 +1064,7 @@ static int runReturnNavigation(void)
     }
 
     setVel2(0, 0);
+    printCurrentPose("Final pose");
     return completed;
 }
 
@@ -995,7 +1096,6 @@ int main(void)
     int lostLineTicks = 0;
     int clearResult = 1;
     int junctionCooldownTicks = 0;
-    int rejectedRecoveryTicks = 0;
     int deadEndLockoutTicks = 0;
     char chosenMove = 'S';
     MappingDecisionState mappingDecision = MAP_DECISION_IDLE;
@@ -1027,7 +1127,6 @@ int main(void)
         targetFound = 0;
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
-        rejectedRecoveryTicks = 0;
         deadEndLockoutTicks = 0;
         mappingDecision = MAP_DECISION_IDLE;
         resetPath();
@@ -1044,19 +1143,13 @@ int main(void)
             else
                 lostLineTicks = 0;
 
-            if (rejectedRecoveryTicks > 0)
-            {
-                rejectedRecoveryTicks--;
-                lostLineTicks = 0;
-            }
-
             if (deadEndLockoutTicks > 0)
             {
                 deadEndLockoutTicks--;
                 lostLineTicks = 0;
             }
 
-            if (junctionCooldownTicks == 0 && rejectedRecoveryTicks == 0 && deadEndLockoutTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            if (junctionCooldownTicks == 0 && deadEndLockoutTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
                 if (recoverLineBeforeDeadEnd(&lastDirection))
                 {
@@ -1123,21 +1216,6 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    if (lineWidthTicks < INTERSECTION_MIN_WIDTH_TICKS)
-                    {
-                        printf("Intersection rejected width=");
-                        printInt(lineWidthTicks, 10);
-                        printf("\n");
-                        driveBackwardTicks(clamp(lineWidthTicks, REJECTED_BACKUP_MIN_TICKS, TARGET_BACKUP_MAX_TICKS));
-                        leds(LED_EXPLORING);
-                        junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
-                        rejectedRecoveryTicks = REJECTED_INTERSECTION_RECOVERY_TICKS;
-                        deadEndLockoutTicks = DEAD_END_LOCKOUT_TICKS;
-                        lostLineTicks = 0;
-                        recoverStableNormalLine(&lastDirection, REJECTED_INTERSECTION_RECOVERY_TICKS, "Rejected intersection recovery");
-                        continue;
-                    }
-
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
                     {
                         targetFound = 1;
@@ -1155,36 +1233,14 @@ int main(void)
                         chosenMove = chooseExplorationMove(junctionSensors);
                         if (!executeExplorationMove(chosenMove))
                         {
-                            printf("Exploration move failed\n");
-                            if (chosenMove == 'L' && hasForwardPath(junctionSensors))
+                            printf("Exploration move failed; retrying same move\n");
+                            if (!executeExplorationMove(chosenMove))
                             {
-                                printf("Recovering from failed left; using straight\n");
-                                if (turnRightToLine())
-                                {
-                                    chosenMove = 'S';
-                                    if (!executeExplorationMove(chosenMove))
-                                        chosenMove = '\0';
-                                }
-                                else
-                                {
-                                    chosenMove = '\0';
-                                }
+                                mappingDecision = MAP_DECISION_IDLE;
+                                setVel2(0, 0);
+                                printf("[ERROR] Exploration move failed twice - map not updated\n");
+                                break;
                             }
-                            else
-                            {
-                                printf("Recovering with backtrack\n");
-                                chosenMove = 'B';
-                                if (!executeExplorationMove(chosenMove))
-                                    chosenMove = '\0';
-                            }
-                        }
-
-                        if (chosenMove == '\0')
-                        {
-                            mappingDecision = MAP_DECISION_IDLE;
-                            setVel2(0, 0);
-                            printf("[ERROR] Exploration recovery failed - line not reacquired\n");
-                            break;
                         }
 
                         if (chosenMove == 'L')
@@ -1227,6 +1283,15 @@ int main(void)
 
         if (targetFound && mode == MODE_TARGET_FOUND)
         {
+#if AUTO_RETURN_AFTER_TARGET
+            mode = MODE_RETURN;
+            if (runReturnNavigation())
+            {
+                mode = MODE_FINISHED;
+                leds(LED_TARGET_FOUND);
+                printf("Finished; press stop to reset\n");
+            }
+#else
             if (waitForReturnStart())
             {
                 mode = MODE_RETURN;
@@ -1237,6 +1302,7 @@ int main(void)
                     printf("Finished; press stop to reset\n");
                 }
             }
+#endif
 
             while (!stopButton())
                 waitTick20ms();
