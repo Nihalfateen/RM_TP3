@@ -85,147 +85,6 @@ Options:
 
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
 
-
-#DP32BL0316$
-DETPIC32, Bootloader V0.3
-Universidade de Aveiro, DETI
-J.L.Azevedo, 2011
-
-Path Finder Robot - exploration left probe-target-v24-junction-lockout
-Press start to run
-Start pose reset x=0 y=0 theta=0mrad
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Rejected intersection recovery
-Stable line reacquired
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Checking lost line before dead end
-Dead end detected
-Intersection clear timeout; holding junction lockout
-Junction clear recovery searching for stable line
-Stable line reacquired
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection clear timeout; holding junction lockout
-Junction clear recovery searching for stable line
-Stable line reacquired
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Checking lost line before dead end
-Dead end detected
-Intersection clear timeout; holding junction lockout
-Junction clear recovery searching for stable line
-Stable line reacquired
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Rejected intersection recovery
-Stable line reacquired
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=11
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Checking lost line before dead end
-Dead end detected
-Dead end turn searching for line
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Intersection clear timeout; holding junction lockout
-Junction clear recovery searching for stable line
-[ERROR] Junction lockout failed - stable line not reacquired
-Press start to run
-
-Goodbye!
-nihal@irislab-lt-05:~/RM_TP3-main/rm_deti_rob/src$ ldpic32 -w rm-pathfinder.hex
-
-DETPIC32 Serial Programmer, V0.5 (January, 2017)
-Universidade de Aveiro, DETI
-J.L.Azevedo (jla@ua.pt)
-
-File: rm-pathfinder.hex
-
-Programming: .................... 100%
-Verifying:   ... Success :)
-
-nihal@irislab-lt-05:~/RM_TP3-main/rm_deti_rob/src$ pterm
-
 DETPIC32 terminal emulator, V0.4 (January, 2017)
 Universidade de Aveiro, DETI
 TOS (tos@ua.pt)
@@ -241,105 +100,60 @@ Path Finder Robot - exploration left probe-target-v24-junction-lockout
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
 Line width ticks=3
 Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
 Intersection cleared
-Recorded move=S
+Centering on line after junction
+[ERROR] Line centering failed
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=3
+Line width ticks=9
 Exploration move: L
 Intersection clear timeout; holding junction lockout
 Junction clear recovery searching for stable line
+Stable line reacquired
+Centering on line after junction
+[ERROR] Line centering failed
 [ERROR] Junction lockout failed - stable line not reacquired
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
-Line width ticks=2
-Intersection rejected width=2
+Line width ticks=1
+Intersection rejected width=1
 Rejected intersection recovery
-Stable line reacquired
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Rejected intersection recovery
-Stable line reacquired
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Rejected intersection recovery
-Stable line reacquired
 Checking lost line before dead end
 Dead end detected
-Dead end turn searching for line
+Intersection clear timeout; holding junction lockout
+Junction clear recovery searching for stable line
+Stable line reacquired
+Centering on line after junction
+Line centered
 Intersection cleared
 Recorded move=B
 Intersection detected
 Line width ticks=3
 Exploration move: L
 Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Rejected intersection recovery
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Rejected intersection recovery
-Stable line reacquired
-Intersection detected
-Line width ticks=0
-Intersection rejected width=0
-Rejected intersection recovery
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
+Centering on line after junction
+[ERROR] Line centering failed
 Press start to run
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
+Path Finder Robot - exploration left probe-target-v24-junction-lockout
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Checking lost line before dead end
+Dead end detected
+Intersection cleared
+Centering on line after junction
+[ERROR] Line centering failed
+Press start to run
+
+
 
 
 
