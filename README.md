@@ -84,132 +84,131 @@ Options:
 6. Tune `LOST_LINE_DEAD_END_TICKS` so small gaps are not treated as dead ends.
 
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
-Path Finder Robot - exploration left probe-target-v19-approach-junction
+Path Finder Robot - exploration left probe-target-v15-stuck-fix
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
-Intersection candidate detected
-Approaching junction
-Junction sensors=01100
-Line width ticks=0
+Intersection detected
+Line width ticks=5
 Exploration move: L
-Move completed
 Recorded move=L
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00110
-Line width ticks=0
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Recorded move=L
+Line width ticks=1
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
 Exploration move: S
-Move completed
 Recorded move=S
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=01101
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
 Line width ticks=1
 Exploration move: L
 Exploration move failed
-Retrying left turn
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=5
 Exploration move: L
-Move completed
 Recorded move=L
+Line width ticks=30
+Target confirmed while clearing intersection sensors=11100 width=30
+Target pose x=754 y=137 theta=4294966386mrad
+Recorded path (17 moves): LLLBLLLLBLLBSSSSL
+Optimized path (11 moves): LLSLLSRSSSL
+Return path (11 moves): RSSSLSRRSRR
+Target reached; press start for return or stop to reset
+Return navigation starting
 Intersection cleared
-Dead end detected
+Return move: R
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return move: S
 Intersection cleared
-Dead end detected
+Return move: S
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return move: S
 Intersection cleared
-Dead end detected
+Return move: L
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return move: S
 Intersection cleared
-Dead end detected
+Return move: R
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return move: R
 Intersection cleared
-Dead end detected
+Return move: S
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return move: R
 Intersection cleared
-Dead end detected
+Return move: R
 Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
+Return decisions complete; searching start pose
 Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
-Intersection cleared
-Intersection candidate detected
-Approaching junction
-Junction sensors=00000
-Line width ticks=0
-Exploration move: B
-Move completed
-Recorded move=B
-Intersection cleared
+Stopping at x=4294967289 y=97 theta=4294965925mrad
+Finished; press stop to reset
+
+
 
 
 
