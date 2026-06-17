@@ -7,6 +7,7 @@
 #define INTERSECTION_SPEED 30
 
 #define INTERSECTION_APPROACH_TICKS 8 
+#define TURN_ENTRY_TICKS 3
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
@@ -28,7 +29,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v15-stuck-fix"
+#define CODE_VERSION "probe-target-v20-turn-entry-start-end"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -617,13 +618,6 @@ static int followLineUntilStartPose(int *lastDirection)
             lostLineTicks = 0;
         }
 
-        if (ticks >= RETURN_START_MIN_TICKS && isNearStartPose())
-        {
-            printCurrentPose("Stopping at");
-            setVel2(0, 0);
-            return 1;
-        }
-
         if (isReturnIntersectionCandidate(sensors))
         {
             driveForwardTicks(INTERSECTION_APPROACH_TICKS);
@@ -769,14 +763,19 @@ static int executeExplorationMove(char move)
     printf("Exploration move: %c\n", move);
 
     if (move == 'L')
+    {
+        driveForwardTicks(TURN_ENTRY_TICKS);
         return turnLeftToLine();
+    }
     if (move == 'R')
     {
+        driveForwardTicks(TURN_ENTRY_TICKS);
         turnRightToLine();
         return 1;
     }
     if (move == 'B')
     {
+        driveForwardTicks(TURN_ENTRY_TICKS);
         turnAroundToLine();
         return 1;
     }
