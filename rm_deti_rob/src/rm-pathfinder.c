@@ -8,7 +8,8 @@
 
 #define INTERSECTION_APPROACH_TICKS 8 
 #define INTERSECTION_CONFIRM_TICKS 4
-#define INTERSECTION_MIN_WIDTH_TICKS 4
+#define INTERSECTION_MIN_WIDTH_TICKS 3
+#define REJECTED_INTERSECTION_RECOVERY_TICKS 20
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
@@ -889,6 +890,7 @@ int main(void)
     int lostLineTicks = 0;
     int clearResult = 1;
     int junctionCooldownTicks = 0;
+    int rejectedRecoveryTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -918,6 +920,7 @@ int main(void)
         targetFound = 0;
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
+        rejectedRecoveryTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -932,7 +935,13 @@ int main(void)
             else
                 lostLineTicks = 0;
 
-            if (junctionCooldownTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            if (rejectedRecoveryTicks > 0)
+            {
+                rejectedRecoveryTicks--;
+                lostLineTicks = 0;
+            }
+
+            if (junctionCooldownTicks == 0 && rejectedRecoveryTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
@@ -990,6 +999,10 @@ int main(void)
                         printf("\n");
                         leds(LED_EXPLORING);
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                        rejectedRecoveryTicks = REJECTED_INTERSECTION_RECOVERY_TICKS;
+                        lostLineTicks = 0;
+                        sensors = readLineSensors(0);
+                        followLine(sensors, &lastDirection);
                         continue;
                     }
 
