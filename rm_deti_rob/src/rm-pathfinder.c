@@ -21,6 +21,7 @@
 #define INTERSECTION_CLEAR_TICKS 6
 #define JUNCTION_LOCKOUT_MIN_TICKS 8
 #define JUNCTION_CLEAR_STABLE_TICKS 6
+#define JUNCTION_REARM_COOLDOWN_TICKS 10
 #define JUNCTION_LOCKOUT_FAIL_TICKS 300
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
@@ -376,6 +377,7 @@ static int hasRightPath(unsigned int sensors)
 }
 
 static int isNormalLine(unsigned int sensors);
+static int isClearNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection, int detectTarget);
 
@@ -434,6 +436,20 @@ static int isNormalLine(unsigned int sensors)
     if (sensors == (SENSOR_CENTER | SENSOR_RIGHT_1))
         return 1;
     if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER | SENSOR_RIGHT_1))
+        return 1;
+
+    return 0;
+}
+
+static int isClearNormalLine(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    if (sensors == SENSOR_CENTER)
+        return 1;
+    if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER))
+        return 1;
+    if (sensors == (SENSOR_CENTER | SENSOR_RIGHT_1))
         return 1;
 
     return 0;
@@ -654,7 +670,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 
         followLine(sensors, lastDirection);
 
-        if (isNormalLine(sensors))
+        if (isClearNormalLine(sensors))
         {
             normalTicks++;
             if (totalTicks >= JUNCTION_LOCKOUT_MIN_TICKS && normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
@@ -871,6 +887,7 @@ int main(void)
     int lineWidthTicks = 0;
     int lostLineTicks = 0;
     int clearResult = 1;
+    int junctionCooldownTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -900,6 +917,7 @@ int main(void)
         intersectionHitTicks = 0;
         targetFound = 0;
         lostLineTicks = 0;
+        junctionCooldownTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -914,7 +932,7 @@ int main(void)
             else
                 lostLineTicks = 0;
 
-            if (lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            if (junctionCooldownTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
@@ -938,11 +956,20 @@ int main(void)
                 if (!clearResult)
                     break;
                 intersectionArmed = clearResult;
+                junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                 leds(LED_EXPLORING);
                 continue;
             }
 
-            if (intersectionArmed)
+            if (junctionCooldownTicks > 0)
+            {
+                junctionCooldownTicks--;
+                intersectionHistory = 0;
+                intersectionHitTicks = 0;
+                lostLineTicks = 0;
+            }
+
+            if (intersectionArmed && junctionCooldownTicks == 0)
             {
                 intersectionHistory <<= 1;
                 if (isIntersectionCandidate(sensors))
@@ -1038,6 +1065,7 @@ int main(void)
                         if (!clearResult)
                             break;
                         intersectionArmed = clearResult;
+                        junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                     }
                     leds(LED_EXPLORING);
                     continue;
