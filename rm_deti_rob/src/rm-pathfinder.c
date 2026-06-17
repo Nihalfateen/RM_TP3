@@ -6,7 +6,7 @@
 #define TURN_SPEED 40
 #define INTERSECTION_SPEED 30
 
-#define INTERSECTION_APPROACH_TICKS 4
+#define INTERSECTION_APPROACH_TICKS 8 
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
@@ -28,7 +28,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v19-approach-junction"
+#define CODE_VERSION "probe-target-v15-stuck-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -955,17 +955,10 @@ int main(void)
                 if (intersectionHitTicks >= INTERSECTION_DEBOUNCE_MIN_HITS)
                 {
                     leds(LED_INTERSECTION);
-                    printf("Intersection candidate detected\n");
+                    printf("Intersection detected\n");
                     intersectionHistory = 0;
                     intersectionHitTicks = 0;
-                    setVel2(0, 0);
-                    waitTick20ms();
-                    printf("Approaching junction\n");
-                    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-                    junctionSensors = readLineSensors(0) & SENSOR_MASK;
-                    printf("Junction sensors=");
-                    printInt(junctionSensors, 2 | 5 << 16);
-                    printf("\n");
+                    junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
@@ -977,30 +970,28 @@ int main(void)
                         break;
                     }
 
+                    driveBackwardTicks(clamp(lineWidthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
+
                     if (!stopButton())
                     {
                         chosenMove = chooseExplorationMove(junctionSensors);
                         if (!executeExplorationMove(chosenMove))
                         {
                             printf("Exploration move failed\n");
-                            if (chosenMove == 'L')
+                            if (chosenMove == 'L' && hasForwardPath(junctionSensors))
                             {
-                                printf("Retrying left turn\n");
-                                if (!executeExplorationMove(chosenMove))
-                                {
-                                    setVel2(0, 0);
-                                    printf("Left turn failed twice; stopping\n");
-                                    break;
-                                }
+                                printf("Recovering from failed left; using straight\n");
+                                turnRightToLine();
+                                chosenMove = 'S';
+                                executeExplorationMove(chosenMove);
                             }
                             else
                             {
-                                setVel2(0, 0);
-                                printf("Exploration move failed; stopping\n");
-                                break;
+                                printf("Recovering with backtrack\n");
+                                chosenMove = 'B';
+                                executeExplorationMove(chosenMove);
                             }
                         }
-                        printf("Move completed\n");
 
                         recordMove(chosenMove);
                         if (pathOverflow)
