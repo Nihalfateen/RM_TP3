@@ -100,29 +100,19 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=4
-Exploration move: L
-Recorded move=L
-Intersection clear timeout; holding junction lockout
-Intersection cleared
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
 Intersection detected
 Line width ticks=1
 Intersection rejected width=1
 Dead end detected
 Intersection cleared
-Dead end detected
-Intersection cleared
 Intersection detected
 Line width ticks=1
 Intersection rejected width=1
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Intersection rejected width=2
 Intersection detected
 Line width ticks=1
 Intersection rejected width=1
@@ -130,15 +120,14 @@ Intersection detected
 Line width ticks=2
 Intersection rejected width=2
 Intersection detected
-Line width ticks=1
-Intersection rejected width=1
-Intersection detected
-Line width ticks=3
+Line width ticks=5
 Exploration move: L
 Recorded move=L
 Intersection cleared
 Dead end detected
 [ERROR] Dead end turn failed - line not reacquired
+Press start to run
+
 
 
 
