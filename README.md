@@ -87,17 +87,84 @@ Options:
 8. Tune `RETURN_START_LOST_LINE_TICKS` if the robot reaches the start line end but stops too early or too late.
 9. Run and record the three required demo runs.
 
-
-DP32BL0316$
-DETPIC32, Bootloader V0.3
-Universidade de Aveiro, DETI
-J.L.Azevedo, 2011
-
-Path Finder Robot - exploration left probe-target-v15-stuck-fix
+Path Finder Robot - exploration left probe-target-v16-return-turn-stop
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Line width ticks=9
+Intersection cleared
+Intersection detected
 Line width ticks=3
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Intersection detected
+Line width ticks=2
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -113,30 +180,15 @@ Line width ticks=2
 Exploration move: L
 Recorded move=L
 Intersection cleared
+Dead end detected
+Intersection cleared
 Intersection detected
-Line width ticks=3
+Line width ticks=2
 Exploration move: L
 Exploration move failed
 Recovering from failed left; using straight
 Exploration move: S
 Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
 Intersection cleared
 Intersection detected
 Line width ticks=4
@@ -149,53 +201,10 @@ Intersection cleared
 Intersection detected
 Line width ticks=2
 Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
+Exploration move failed
+Recovering from failed left; using straight
+Exploration move: S
+Recorded move=S
 Intersection cleared
 Intersection detected
 Line width ticks=1
@@ -207,32 +216,14 @@ Recorded move=S
 Intersection cleared
 Intersection detected
 Line width ticks=5
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=4
 Exploration move: L
 Recorded move=L
 Line width ticks=30
 Target confirmed while clearing intersection sensors=11100 width=30
-Target pose x=753 y=243 theta=4294966440mrad
-Recorded path (27 moves): LLBLSSBLLSLLLBLLLLBLLBSSSSL
-Optimized path (17 moves): LSSRLSLLSLLSRSSSL
-Return path (17 moves): RSSSLSRRSRRSRLSSR
+Target pose x=759 y=219 theta=4294966514mrad
+Recorded path (25 moves): LLBLSBLLSLLLBLLLLBLBSSSSL
+Optimized path (13 moves): LSRLSLLSLRSSL
+Return path (13 moves): RSSLRSRRSRLSR
 Target reached; press start for return or stop to reset
 Return navigation starting
 Intersection cleared
@@ -242,14 +233,8 @@ Return move: S
 Intersection cleared
 Return move: S
 Intersection cleared
-Return move: S
-Intersection cleared
 Return move: L
 Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection cleared
 Return move: R
 Intersection cleared
 Return move: S
@@ -257,27 +242,25 @@ Intersection cleared
 Return move: R
 Intersection cleared
 Return move: R
+Intersection cleared
+Return move: S
+Intersection cleared
+Return move: R
+Intersection cleared
+Return move: L
 Intersection clear timeout
 Return move: S
 Intersection cleared
 Return move: R
-Intersection cleared
-Return move: L
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection cleared
+Intersection clear timeout
 Return decisions complete; searching start pose
 Intersection cleared
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Stopping at start line end x=4294967263 y=300 theta=2152mrad
+Stopping at x=198 y=283 theta=4294965499mrad
 Finished; press stop to reset
-Press start to run
+
+
+
+
 
 
 
