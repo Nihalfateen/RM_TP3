@@ -85,12 +85,13 @@ Options:
 
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
 
+
 #DP32BL0316$
 DETPIC32, Bootloader V0.3
 Universidade de Aveiro, DETI
 J.L.Azevedo, 2011
 
-Path Finder Robot - exploration left probe-target-v23-stable-clear
+Path Finder Robot - exploration left probe-target-v24-junction-lockout
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
@@ -99,86 +100,26 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=5
-Exploration move: L
-Recorded move=L
-Intersection clear timeout
-Intersection detected
 Line width ticks=2
 Exploration move: L
 Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Dead end detected
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=5
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Dead end detected
 Intersection cleared
 Intersection detected
 Line width ticks=4
 Exploration move: L
 Recorded move=L
 Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
+Dead end detected
 Intersection cleared
 Intersection detected
 Line width ticks=5
 Exploration move: L
 Recorded move=L
 Intersection cleared
-Dead end detected
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Recorded move=L
 Intersection cleared
 Intersection detected
 Line width ticks=2
@@ -186,7 +127,14 @@ Exploration move: L
 Recorded move=L
 Intersection cleared
 Intersection detected
-Line width ticks=1
+Line width ticks=3
+Exploration move: L
+Recorded move=L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -194,9 +142,6 @@ Dead end detected
 Intersection cleared
 Intersection detected
 Line width ticks=1
-Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
 Exploration move: S
 Recorded move=S
 Intersection cleared
@@ -214,83 +159,24 @@ Exploration move: S
 Recorded move=S
 Intersection cleared
 Intersection detected
-Line width ticks=2
+Line width ticks=1
 Exploration move: L
 Exploration move failed
 Recovering from failed left; using straight
-Exploration move: S
-Recorded move=S
-Intersection cleared
+[ERROR] Exploration recovery failed - line not reacquired
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
-Line width ticks=6
+Line width ticks=5
 Exploration move: L
 Recorded move=L
-Intersection clear timeout
-Dead end detected
-Intersection clear timeout
-Intersection detected
-Line width ticks=30
-Target confirmed at intersection sensors=11111 width=30
-Target pose x=886 y=766 theta=1730mrad
-Recorded path (27 moves): LLLSSBLLSLLLBLLLLBLLBSSSSLB
-Optimized path (19 moves): LLLSRLSLLSLLSRSSSLB
-Return path (19 moves): BRSSSLSRRSRRSRLSRRR
-Target reached; press start for return or stop to reset
-Return navigation starting
-Intersection cleared
-Return move: B
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: L
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: S
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: L
-Intersection cleared
-Return move: S
-Intersection clear timeout
-Return move: R
-Intersection cleared
-Return move: R
-Intersection cleared
-Return move: R
-Intersection cleared
-Return decisions complete; searching start pose
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Intersection cleared
-Start pose search timeout x=202 y=216 theta=915mrad
+Intersection clear timeout; holding junction lockout
+[ERROR] Junction lockout failed - stable line not reacquired
 Press start to run
 #DP32BL0316$
 DETPIC32, Bootloader V0.3
 Universidade de Aveiro, DETI
 J.L.Azevedo, 2011
-
 
 
 
