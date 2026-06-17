@@ -29,8 +29,6 @@
 #define JUNCTION_REARM_COOLDOWN_TICKS 10
 #define JUNCTION_LOCKOUT_FAIL_TICKS 300
 #define INTERSECTION_CLEAR_MAX_TICKS 100
-#define LINE_CENTER_STABLE_TICKS 5
-#define LINE_CENTER_SETTLE_MAX_TICKS 50
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
@@ -42,7 +40,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v24-junction-lockout"
+#define CODE_VERSION "probe-target-v25-mapping-guard-no-centering"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -394,7 +392,6 @@ static int hasRightPath(unsigned int sensors)
 
 static int isNormalLine(unsigned int sensors);
 static int isClearNormalLine(unsigned int sensors);
-static int isCenteredNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection, int detectTarget);
 
@@ -492,18 +489,6 @@ static int isClearNormalLine(unsigned int sensors)
         return 1;
 
     return 0;
-}
-
-static int isCenteredNormalLine(unsigned int sensors)
-{
-    sensors &= SENSOR_MASK;
-
-    if ((sensors & SENSOR_CENTER) == 0)
-        return 0;
-    if (sensors & (SENSOR_LEFT_2 | SENSOR_RIGHT_2))
-        return 0;
-
-    return lineError(sensors) == 0;
 }
 
 static int isLineWidthReading(unsigned int sensors)
@@ -705,40 +690,6 @@ static int followLineUntilStartPose(int *lastDirection)
     return 0;
 }
 
-static int settleCenteredOnLine(int *lastDirection)
-{
-    int ticks;
-    int centeredTicks = 0;
-    unsigned int sensors;
-
-    printf("Centering on line after junction\n");
-
-    for (ticks = 0; ticks < LINE_CENTER_SETTLE_MAX_TICKS && !stopButton(); ticks++)
-    {
-        waitTick20ms();
-        sensors = readLineSensors(0);
-        followLine(sensors, lastDirection);
-
-        if (isCenteredNormalLine(sensors))
-        {
-            centeredTicks++;
-            if (centeredTicks >= LINE_CENTER_STABLE_TICKS)
-            {
-                printf("Line centered\n");
-                return 1;
-            }
-        }
-        else
-        {
-            centeredTicks = 0;
-        }
-    }
-
-    setVel2(0, 0);
-    printf("[ERROR] Line centering failed\n");
-    return 0;
-}
-
 static int recoverStableNormalLine(int *lastDirection, int maxTicks, char *label)
 {
     int ticks;
@@ -759,7 +710,7 @@ static int recoverStableNormalLine(int *lastDirection, int maxTicks, char *label
             if (normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
             {
                 printf("Stable line reacquired\n");
-                return settleCenteredOnLine(lastDirection);
+                return 1;
             }
         }
         else
@@ -804,7 +755,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
             if (totalTicks >= JUNCTION_LOCKOUT_MIN_TICKS && normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
             {
                 printf("Intersection cleared\n");
-                return settleCenteredOnLine(lastDirection);
+                return 1;
             }
         }
         else
