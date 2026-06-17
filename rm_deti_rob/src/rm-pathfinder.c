@@ -7,6 +7,8 @@
 #define INTERSECTION_SPEED 30
 
 #define INTERSECTION_APPROACH_TICKS 8 
+#define INTERSECTION_CONFIRM_TICKS 4
+#define INTERSECTION_MIN_WIDTH_TICKS 4
 #define LEFT_TURN_MIN_TICKS 8
 #define LEFT_TURN_MAX_TICKS 50
 #define RIGHT_TURN_MIN_TICKS 8
@@ -881,7 +883,6 @@ int main(void)
     unsigned int junctionSensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
-    int intersectionHistory = 0;
     int intersectionHitTicks = 0;
     int targetFound = 0;
     int lineWidthTicks = 0;
@@ -913,7 +914,6 @@ int main(void)
         leds(LED_EXPLORING);
         lastDirection = 1;
         intersectionArmed = 1;
-        intersectionHistory = 0;
         intersectionHitTicks = 0;
         targetFound = 0;
         lostLineTicks = 0;
@@ -964,34 +964,34 @@ int main(void)
             if (junctionCooldownTicks > 0)
             {
                 junctionCooldownTicks--;
-                intersectionHistory = 0;
                 intersectionHitTicks = 0;
                 lostLineTicks = 0;
             }
 
             if (intersectionArmed && junctionCooldownTicks == 0)
             {
-                intersectionHistory <<= 1;
                 if (isIntersectionCandidate(sensors))
-                    intersectionHistory |= 1;
-                intersectionHistory &= 0x07;
+                    intersectionHitTicks++;
+                else
+                    intersectionHitTicks = 0;
 
-                intersectionHitTicks = 0;
-                if (intersectionHistory & 0x01)
-                    intersectionHitTicks++;
-                if (intersectionHistory & 0x02)
-                    intersectionHitTicks++;
-                if (intersectionHistory & 0x04)
-                    intersectionHitTicks++;
-
-                if (intersectionHitTicks >= INTERSECTION_DEBOUNCE_MIN_HITS)
+                if (intersectionHitTicks >= INTERSECTION_CONFIRM_TICKS)
                 {
                     leds(LED_INTERSECTION);
                     printf("Intersection detected\n");
-                    intersectionHistory = 0;
                     intersectionHitTicks = 0;
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
+
+                    if (lineWidthTicks < INTERSECTION_MIN_WIDTH_TICKS)
+                    {
+                        printf("Intersection rejected width=");
+                        printInt(lineWidthTicks, 10);
+                        printf("\n");
+                        leds(LED_EXPLORING);
+                        junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                        continue;
+                    }
 
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
                     {
@@ -1072,7 +1072,7 @@ int main(void)
                 }
             }
 
-            if (!intersectionArmed || intersectionHitTicks < INTERSECTION_DEBOUNCE_MIN_HITS)
+            if (!intersectionArmed || intersectionHitTicks < INTERSECTION_CONFIRM_TICKS)
             {
                 followLine(sensors, &lastDirection);
             }
