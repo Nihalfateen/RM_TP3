@@ -86,53 +86,93 @@ Options:
 7. Tune `START_REACHED_RADIUS_MM` for reliable final stopping with encoder odometry.
 
 
+#DP32BL0316$
+DETPIC32, Bootloader V0.3
+Universidade de Aveiro, DETI
+J.L.Azevedo, 2011
+
 Path Finder Robot - exploration left probe-target-v24-junction-lockout
 Press start to run
 Start pose reset x=0 y=0 theta=0mrad
 Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
 Line width ticks=2
-Exploration move: L
-Recorded move=L
+Intersection rejected width=2
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=3
+Intersection rejected width=3
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=3
+Intersection rejected width=3
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
 Intersection cleared
 Intersection detected
 Line width ticks=3
-Exploration move: S
-Recorded move=S
-Intersection cleared
+Intersection rejected width=3
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
 Dead end detected
 Intersection cleared
 Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
 Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
+Intersection rejected width=1
 Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Recorded move=L
-Intersection cleared
-Intersection detected
-Line width ticks=2
+Line width ticks=4
 Exploration move: L
 Recorded move=L
 Intersection cleared
@@ -140,11 +180,83 @@ Dead end detected
 Intersection cleared
 Intersection detected
 Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=8
 Exploration move: L
-Exploration move failed
-Recovering from failed left; using straight
-[ERROR] Exploration recovery failed - line not reacquired
+Recorded move=L
+Intersection clear timeout; holding junction lockout
+[ERROR] Junction lockout failed - stable line not reacquired
 Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Dead end detected
+Intersection clear timeout; holding junction lockout
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Intersection rejected width=3
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=3
+Intersection rejected width=3
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Intersection rejected width=1
+Intersection detected
+Line width ticks=2
+Intersection rejected width=2
+Intersection detected
+Line width ticks=30
+Target confirmed at intersection sensors=11100 width=30
+Target pose x=122 y=4294967249 theta=2085mrad
+Recorded path (6 moves): BBBBBB
+Optimized path (2 moves): BB
+Return path (2 moves): BB
+Target reached; press start for return or stop to reset
+
+
 
 
 
