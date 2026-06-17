@@ -805,7 +805,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
 static int turnLeftToLine(void)
 {
     int ticks = 0;
-    int normalTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(-TURN_SPEED, TURN_SPEED);
@@ -816,18 +815,10 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= LEFT_TURN_MIN_TICKS && isClearNormalLine(sensors))
+        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
-            normalTicks++;
-            if (normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
-            {
-                setVel2(0, 0);
-                return 1;
-            }
-        }
-        else
-        {
-            normalTicks = 0;
+            setVel2(0, 0);
+            return 1;
         }
     }
 
@@ -838,7 +829,6 @@ static int turnLeftToLine(void)
 static int turnRightToLine(void)
 {
     int ticks = 0;
-    int normalTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -849,18 +839,10 @@ static int turnRightToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= RIGHT_TURN_MIN_TICKS && isClearNormalLine(sensors))
+        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
-            normalTicks++;
-            if (normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
-            {
-                setVel2(0, 0);
-                return 1;
-            }
-        }
-        else
-        {
-            normalTicks = 0;
+            setVel2(0, 0);
+            return 1;
         }
     }
 
@@ -871,7 +853,6 @@ static int turnRightToLine(void)
 static int turnAroundToLine(void)
 {
     int ticks = 0;
-    int normalTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -884,16 +865,8 @@ static int turnAroundToLine(void)
 
         if (ticks >= TURN_AROUND_MIN_TICKS && isClearNormalLine(sensors))
         {
-            normalTicks++;
-            if (normalTicks >= JUNCTION_CLEAR_STABLE_TICKS)
-            {
-                setVel2(0, 0);
-                return 1;
-            }
-        }
-        else
-        {
-            normalTicks = 0;
+            setVel2(0, 0);
+            return 1;
         }
     }
 
