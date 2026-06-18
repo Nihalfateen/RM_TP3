@@ -88,401 +88,216 @@ Options:
 
 
 
-#DP32BL0316$
-DETPIC32, Bootloader V0.3
-Universidade de Aveiro, DETI
-J.L.Azevedo, 2011
+Path Finder Robot - exploration left probe-target-v15-stuck-fix
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=7
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=7
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=20
+Target confirmed at intersection sensors=11111 width=20
+Target pose x=793 y=4294967268 theta=4294967215mrad
+Recorded path (9 moves): LLBSSLLLL
+Optimized path (7 moves): LRSLLLL
+Return path (7 moves): RRRRSLR
+Target reached; press start for return or stop to reset
+Press start to run
+Start pose reset x=0 y=0 theta=0mrad
+Intersection detected
+Line width ticks=9
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection clear timeout
+Intersection detected
+Line width ticks=5
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=7
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=7
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=5
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: S
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=1
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=6
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=2
+Exploration move: L
+Intersection clear timeout
+Intersection detected
+Line width ticks=5
+Exploration move: S
+Intersection cleared
+Dead end detected
+Intersection cleared
+Intersection detected
+Line width ticks=4
+Exploration move: L
+Intersection cleared
+Intersection detected
+Line width ticks=3
+Exploration move: L
+Intersection cleared
+Dead end detected
+Intersection clear timeout
+Press start to run
 
-Path Finder Robot - exploration left probe-target-v26-width-safe
-Press start to run
-Start pose reset x=0 y=0 theta=0mrad
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Line width ticks=3
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Line width ticks=1
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Line width ticks=1
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Exploration move failed; retrying same move
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Dead end detected
-Line width ticks=6
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Line width ticks=4
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=0
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Line width ticks=7
-Line width ticks=26
-Target confirmed while clearing intersection sensors=11100 width=26
-Target pose x=586 y=383 theta=4294966130mrad
-Recorded path (14 moves): LLLLLSBBBBBBBL
-Optimized path (6 moves): LLLLLR
-Return path (6 moves): LRRRRR
-Recorded move=L
-Return navigation starting
-Intersection cleared
-Return candidate detected
-Line width ticks=2
-Return move: L
-[WARN] Return move failed; trying bounded recovery
-Return move recovery
-[ERROR] Return move failed - move not consumed
-Final pose x=155 y=591 theta=2588mrad
-Press start to run
-Start pose reset x=0 y=0 theta=0mrad
-Intersection detected
-Line width ticks=4
-Exploration move: L
-Line width ticks=5
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Stable line reacquired
-Dead end ignored - line recovered
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Checking lost line before dead end
-Dead end detected
-Dead end turn searching for line
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Line width ticks=3
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Dead end detected
-Dead end turn searching for line
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Exploration move failed; retrying same move
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Stable line reacquired
-Dead end ignored - line recovered
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Exploration move failed; retrying same move
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Checking lost line before dead end
-Dead end detected
-Dead end turn searching for line
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Line width ticks=2
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=12
-Exploration move: L
-Line width ticks=6
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Exploration move failed; retrying same move
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: L
-Exploration move failed; retrying same move
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=3
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Dead end detected
-Line width ticks=1
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Line width ticks=2
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Line width ticks=2
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Line width ticks=7
-Line width ticks=1
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Dead end turn searching for line
-Intersection cleared
-Recorded move=B
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Line width ticks=3
-Line width ticks=1
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=2
-Exploration move: L
-Intersection cleared
-Recorded move=L
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Intersection detected
-Line width ticks=1
-Exploration move: S
-Intersection cleared
-Recorded move=S
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Dead end detected
-Intersection cleared
-Recorded move=B
-Checking lost line before dead end
-Stable line reacquired
-Dead end ignored - line recovered
-Intersection detected
-Line width ticks=5
-Exploration move: L
-Line width ticks=17
-Target confirmed while clearing intersection sensors=11111 width=17
-Target pose x=545 y=818 theta=4294965348mrad
-Recorded path (48 moves): LLLSLLBLLSBLLLSLLLBLLLBLLLLLLSBBBBBBBBBBBBLLSSBB
-Optimized path (26 moves): LLLSLSLRLLSLLSLSLLLLLSLLSS
-Return path (26 moves): SSRRSRRRRRSRSRRSRRLRSRSRRR
-Recorded move=L
-Return navigation starting
-Intersection cleared
-Return candidate detected
-Line width ticks=1
-Return move: S
-Return move completed
-Intersection cleared
-Return index=1/26
-Return candidate detected
-Line width ticks=2
-Return move: S
-Return move completed
-Intersection cleared
-Return index=2/26
-Return candidate detected
-Line width ticks=1
-Return move: R
-Return move completed
-Intersection cleared
-Return index=3/26
-Return candidate detected
-Line width ticks=2
-Return move: R
-Return move completed
-Intersection clear timeout; holding junction lockout
-Junction clear recovery searching for stable line
-[ERROR] Junction lockout failed - stable line not reacquired
-[WARN] Return line reacquisition failed; trying bounded recovery
-Return line recovery
-[ERROR] Return line reacquisition failed after move
-Final pose x=616 y=1792 theta=1666mrad
+
+Serial Port Read Error!
+
+Communication aborted. Check USB cable!!!
+
+Goodbye!
+nihal@irislab-lt-05:~/RM_TP3-main/rm_deti_rob/src$ 
 
 
 
