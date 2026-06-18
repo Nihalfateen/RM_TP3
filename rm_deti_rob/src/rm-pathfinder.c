@@ -15,7 +15,7 @@
 #define TURN_AROUND_MAX_TICKS 100
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 14
+#define TARGET_WIDTH_MIN_TICKS 20
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 4
@@ -24,14 +24,11 @@
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
-/* FIX v17: reduced from 850 to 300 mm. 850 was so large the robot stopped
-   ~60 cm before the real origin. 300 mm gives encoder-drift tolerance
-   without stopping a full tile early. */
-#define START_REACHED_RADIUS_MM 300
+#define START_REACHED_RADIUS_MM 850
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v17-stop-fix"
+#define CODE_VERSION "probe-target-v15-stuck-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -443,12 +440,7 @@ static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    /* FIX: removed the mandatory hasForwardPath() requirement.
-       The target wide-line can appear at a dead-end where only lateral
-       sensors fire. Requiring activeSensorCount >= TARGET_MIN_BLACK_SENSORS
-       (3) and at least one non-center sensor is sufficient to distinguish
-       a wide target line from a normal narrow line. */
-    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && (hasLeftPath(sensors) || hasRightPath(sensors) || hasForwardPath(sensors));
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && (hasLeftPath(sensors) || hasRightPath(sensors));
 }
 
 static int isIntersectionCandidate(unsigned int sensors)
@@ -552,7 +544,6 @@ static void driveForwardTicks(int ticks)
     setVel2(INTERSECTION_SPEED, INTERSECTION_SPEED);
     for (i = 0; i < ticks && !stopButton(); i++)
         waitTick20ms();
-    setVel2(0, 0); /* FIX: stop motors after timed drive */
 }
 
 static void driveBackwardTicks(int ticks)
@@ -611,10 +602,7 @@ static int followLineUntilStartPose(int *lastDirection)
         if ((sensors & SENSOR_MASK) == 0)
         {
             lostLineTicks++;
-            /* FIX v17: only allow lost-line stop after RETURN_START_MIN_TICKS.
-               Without this guard the robot could stop immediately after the
-               last return-path turn while still rotating to find the line. */
-            if (ticks >= RETURN_START_MIN_TICKS && lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
+            if (lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
             {
                 printCurrentPose("Stopping at start line end");
                 setVel2(0, 0);
@@ -811,11 +799,6 @@ static int runReturnNavigation(void)
     printf("Return navigation starting\n");
 
     turnAroundToLine();
-    /* FIX: after turning around, drive forward a short distance to clear
-       the target-area wide line before arming intersection detection.
-       Without this, the wide target line is immediately re-detected as
-       an intersection and the first return move is consumed prematurely. */
-    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
     intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
 
     while (!stopButton())
@@ -861,17 +844,10 @@ static int waitForReturnStart(void)
 
     printf("Target reached; press start for return or stop to reset\n");
 
-    /* FIX: wait for start button to be released first (debounce),
-       then wait for a fresh press. This ensures a single deliberate
-       press triggers the return phase instead of requiring two presses. */
     while (startButton() && !stopButton())
-        waitTick20ms(); /* release any held press */
+        waitTick20ms();
 
     while (!startButton() && !stopButton())
-        waitTick20ms(); /* wait for fresh press */
-
-    /* settle: wait for the button to be released again */
-    while (startButton() && !stopButton())
         waitTick20ms();
 
     return !stopButton();
