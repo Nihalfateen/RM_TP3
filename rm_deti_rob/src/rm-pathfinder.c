@@ -1025,15 +1025,12 @@ int main(void)
 
         if (targetFound && mode == MODE_TARGET_FOUND)
         {
-            if (waitForReturnStart())
+            mode = MODE_RETURN;
+            if (runReturnNavigation())
             {
-                mode = MODE_RETURN;
-                if (runReturnNavigation())
-                {
-                    mode = MODE_FINISHED;
-                    leds(LED_TARGET_FOUND);
-                    printf("Finished; press stop to reset\n");
-                }
+                mode = MODE_FINISHED;
+                leds(LED_TARGET_FOUND);
+                printf("Finished; press stop to reset\n");
             }
 
             while (!stopButton())
