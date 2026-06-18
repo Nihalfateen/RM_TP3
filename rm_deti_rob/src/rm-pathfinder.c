@@ -598,15 +598,6 @@ static int followLineUntilStartPose(int *lastDirection)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
-        if (isLineWidthReading(sensors))
-        {
-            if (probeTarget(sensors, "while following line"))
-            {
-                targetFound = 1;
-                mode = MODE_TARGET_FOUND;
-                break;
-            }
-        }
 
         if ((sensors & SENSOR_MASK) == 0)
         {
