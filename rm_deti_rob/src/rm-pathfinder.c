@@ -17,6 +17,7 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 18
 #define TARGET_FULL_MASK_MIN_TICKS 8
+#define TARGET_PASSIVE_MARKER_TICKS 5
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
@@ -872,6 +873,7 @@ int main(void)
     int lostLineTicks = 0;
     int clearResult = 1;
     int junctionCooldownTicks = 0;
+    int targetMarkerTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -902,6 +904,7 @@ int main(void)
         targetFound = 0;
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
+        targetMarkerTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -910,6 +913,22 @@ int main(void)
         {
             waitTick20ms();
             sensors = readLineSensors(0);
+
+            if ((sensors & SENSOR_MASK) == SENSOR_MASK)
+            {
+                targetMarkerTicks++;
+                if (targetMarkerTicks >= TARGET_PASSIVE_MARKER_TICKS)
+                {
+                    targetFound = 1;
+                    mode = MODE_TARGET_FOUND;
+                    confirmTarget(sensors, targetMarkerTicks, "while following marker");
+                    break;
+                }
+            }
+            else
+            {
+                targetMarkerTicks = 0;
+            }
 
             if ((sensors & SENSOR_MASK) == 0)
                 lostLineTicks++;
