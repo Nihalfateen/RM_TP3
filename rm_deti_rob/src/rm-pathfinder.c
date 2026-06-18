@@ -22,6 +22,7 @@
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
+#define JUNCTION_REARM_COOLDOWN_TICKS 10
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
 #define START_REACHED_RADIUS_MM 850
@@ -869,6 +870,7 @@ int main(void)
     int lineWidthTicks = 0;
     int lostLineTicks = 0;
     int clearResult = 1;
+    int junctionCooldownTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -898,6 +900,7 @@ int main(void)
         intersectionHitTicks = 0;
         targetFound = 0;
         lostLineTicks = 0;
+        junctionCooldownTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -911,6 +914,14 @@ int main(void)
                 lostLineTicks++;
             else
                 lostLineTicks = 0;
+
+            if (junctionCooldownTicks > 0)
+            {
+                junctionCooldownTicks--;
+                intersectionHistory = 0;
+                intersectionHitTicks = 0;
+                lostLineTicks = 0;
+            }
 
             if (lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
@@ -935,11 +946,12 @@ int main(void)
                     break;
                 }
                 intersectionArmed = clearResult;
+                junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                 leds(LED_EXPLORING);
                 continue;
             }
 
-            if (intersectionArmed)
+            if (intersectionArmed && junctionCooldownTicks == 0)
             {
                 intersectionHistory <<= 1;
                 if (isIntersectionCandidate(sensors))
@@ -963,7 +975,7 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
+                    if ((junctionSensors & SENSOR_MASK) == SENSOR_MASK || lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
@@ -1009,6 +1021,7 @@ int main(void)
                             break;
                         }
                         intersectionArmed = clearResult;
+                        junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                     }
                     leds(LED_EXPLORING);
                     continue;
