@@ -16,6 +16,7 @@
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 18
+#define TARGET_FULL_MASK_MIN_TICKS 8
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
@@ -975,7 +976,7 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    if ((junctionSensors & SENSOR_MASK) == SENSOR_MASK || lineWidthTicks >= TARGET_WIDTH_MIN_TICKS)
+                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || ((junctionSensors & SENSOR_MASK) == SENSOR_MASK && lineWidthTicks >= TARGET_FULL_MASK_MIN_TICKS))
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
