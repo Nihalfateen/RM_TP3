@@ -18,7 +18,7 @@
 #define TARGET_WIDTH_MIN_TICKS 20
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
-#define INTERSECTION_CLEAR_TICKS 4
+#define INTERSECTION_CLEAR_TICKS 8
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
@@ -766,8 +766,13 @@ static int executeExplorationMove(char move)
     printf("Exploration move: %c\n", move);
 
     if (move == 'L')
+    {
+        driveForwardTicks(4);
         return turnLeftToLine();
+    }
+
     if (move == 'R')
+
     {
         turnRightToLine();
         return 1;
@@ -923,6 +928,7 @@ int main(void)
                 turnAroundToLine();
                 lastDirection = 1;
                 clearResult = waitUntilNormalLine(&lastDirection, 1);
+                driveForwardTicks(5);
                 if (clearResult == 2)
                 {
                     targetFound = 1;
