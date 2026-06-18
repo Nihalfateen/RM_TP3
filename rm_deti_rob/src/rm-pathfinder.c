@@ -3,12 +3,12 @@
 #define BASE_SPEED 40
 #define TURN_GAIN 7
 #define SEARCH_SPEED 25
-#define TURN_SPEED 35
+#define TURN_SPEED 30
 #define INTERSECTION_SPEED 30
 
 #define INTERSECTION_APPROACH_TICKS 8
-#define LEFT_TURN_MIN_TICKS 8
-#define LEFT_TURN_MAX_TICKS 70
+#define LEFT_TURN_MIN_TICKS 5
+#define LEFT_TURN_MAX_TICKS 100
 #define RIGHT_TURN_MIN_TICKS 8
 #define RIGHT_TURN_MAX_TICKS 70
 #define TURN_AROUND_MIN_TICKS 20
@@ -691,7 +691,7 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        // Look for the center sensor to re-acquire the line
+
         if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
         {
             setVel2(0, 0);
@@ -767,7 +767,6 @@ static int executeExplorationMove(char move)
 
     if (move == 'L')
     {
-        driveForwardTicks(4);
         return turnLeftToLine();
     }
 
@@ -972,6 +971,8 @@ int main(void)
                         confirmTarget(junctionSensors, lineWidthTicks, "at intersection");
                         break;
                     }
+
+                    driveBackwardTicks(clamp(lineWidthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
 
                     if (!stopButton())
                     {
