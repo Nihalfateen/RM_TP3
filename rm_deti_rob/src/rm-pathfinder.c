@@ -387,7 +387,7 @@ static int hasRightPath(unsigned int sensors)
 
 static int isNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
-static int waitUntilNormalLine(int *lastDirection, int detectTarget);
+static int waitUntilNormalLine(int *lastDirection);
 
 static int hasReturnIntersection(unsigned int sensors)
 {
@@ -506,6 +506,7 @@ static char chooseExplorationMove(unsigned int sensors)
 static int measureLineWidthTicks(unsigned int firstSensors)
 {
     int widthTicks = 0;
+    int fullMaskRun = 0;
     unsigned int sensors = firstSensors & SENSOR_MASK;
 
     lastFullMaskTicks = 0;
@@ -515,7 +516,15 @@ static int measureLineWidthTicks(unsigned int firstSensors)
     {
         widthTicks++;
         if ((sensors & SENSOR_MASK) == SENSOR_MASK)
-            lastFullMaskTicks++;
+        {
+            fullMaskRun++;
+            if (fullMaskRun > lastFullMaskTicks)
+                lastFullMaskTicks = fullMaskRun;
+        }
+        else
+        {
+            fullMaskRun = 0;
+        }
 
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
@@ -554,28 +563,6 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     printOptimizedPath();
     buildReturnPath();
     printReturnPath();
-}
-
-static int probeTarget(unsigned int sensors, char *source)
-{
-    int widthTicks;
-
-    if (!isLineWidthReading(sensors))
-        return 0;
-
-    widthTicks = measureLineWidthTicks(sensors);
-
-    /* FIX BUG-TARGET: accept target if either the forward scan is long
-       enough (wide line) OR the full-mask count is long enough (block). */
-    if (widthTicks < TARGET_WIDTH_MIN_TICKS && lastFullMaskTicks < TARGET_FULL_MASK_MIN_TICKS)
-    {
-        driveBackwardTicks(clamp(widthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
-        return 0;
-    }
-
-    driveBackwardTicks(clamp(widthTicks / 4, 0, TARGET_BACKUP_MAX_TICKS));
-    confirmTarget(sensors, widthTicks, source);
-    return 1;
 }
 
 /* FIX BUG-01: added setVel2(0, 0) at the end. Without it motors kept
@@ -672,7 +659,7 @@ static int followLineUntilStartPose(int *lastDirection)
         if (isReturnIntersectionCandidate(sensors))
         {
             driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-            waitUntilNormalLine(lastDirection, 0);
+            waitUntilNormalLine(lastDirection);
             ticks += INTERSECTION_APPROACH_TICKS;
             continue;
         }
@@ -686,7 +673,7 @@ static int followLineUntilStartPose(int *lastDirection)
     return 0;
 }
 
-static int waitUntilNormalLine(int *lastDirection, int detectTarget)
+static int waitUntilNormalLine(int *lastDirection)
 {
     int normalTicks = 0;
     int totalTicks = 0;
@@ -696,11 +683,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
     {
         waitTick20ms();
         sensors = readLineSensors(0);
-
-        if (detectTarget && totalTicks > 5 && probeTarget(sensors, "while clearing intersection"))
-        {
-            return 2;
-        }
 
         followLine(sensors, lastDirection);
 
@@ -722,7 +704,7 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
     }
 
     printf("Intersection clear timeout\n");
-    return 1;
+    return 0;
 }
 
 static int turnLeftToLine(void)
@@ -840,6 +822,7 @@ static int runReturnNavigation(void)
     int lastDirection = 1;
     int intersectionArmed = 1;
     int returnCandidateTicks = 0;
+    int rearmNormalTicks = 0;
     int completed = 0;
 
     leds(LED_EXPLORING | LED_TARGET_FOUND);
@@ -851,7 +834,7 @@ static int runReturnNavigation(void)
        is immediately re-detected as an intersection and the first return
        move is consumed prematurely. */
     driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-    intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
+    intersectionArmed = waitUntilNormalLine(&lastDirection);
 
     while (!stopButton())
     {
@@ -865,6 +848,25 @@ static int runReturnNavigation(void)
             break;
         }
 
+        if (!intersectionArmed)
+        {
+            if (isNormalLine(sensors))
+            {
+                rearmNormalTicks++;
+                if (rearmNormalTicks >= INTERSECTION_CLEAR_TICKS)
+                {
+                    intersectionArmed = 1;
+                    rearmNormalTicks = 0;
+                    returnCandidateTicks = 0;
+                    printf("Intersection rearmed\n");
+                }
+            }
+            else
+            {
+                rearmNormalTicks = 0;
+            }
+        }
+
         if (intersectionArmed && isReturnIntersectionCandidate(sensors))
             returnCandidateTicks++;
         else
@@ -876,7 +878,8 @@ static int runReturnNavigation(void)
             returnCandidateTicks = 0;
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
-            intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
+            intersectionArmed = waitUntilNormalLine(&lastDirection);
+            rearmNormalTicks = 0;
             leds(LED_EXPLORING | LED_TARGET_FOUND);
         }
         else
@@ -924,6 +927,7 @@ int main(void)
     int lostLineTicks = 0;
     int clearResult = 1;
     int junctionCooldownTicks = 0;
+    int rearmNormalTicks = 0;
     char chosenMove = 'S';
     RobotMode mode = MODE_IDLE;
 
@@ -954,6 +958,7 @@ int main(void)
         targetFound = 0;
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
+        rearmNormalTicks = 0;
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -974,9 +979,30 @@ int main(void)
                 intersectionHistory = 0;
                 intersectionHitTicks = 0;
                 lostLineTicks = 0;
+                rearmNormalTicks = 0;
             }
 
-            if (lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
+            if (!intersectionArmed && junctionCooldownTicks == 0)
+            {
+                if (isNormalLine(sensors))
+                {
+                    rearmNormalTicks++;
+                    if (rearmNormalTicks >= INTERSECTION_CLEAR_TICKS)
+                    {
+                        intersectionArmed = 1;
+                        rearmNormalTicks = 0;
+                        intersectionHistory = 0;
+                        intersectionHitTicks = 0;
+                        printf("Intersection rearmed\n");
+                    }
+                }
+                else
+                {
+                    rearmNormalTicks = 0;
+                }
+            }
+
+            if (intersectionArmed && junctionCooldownTicks == 0 && lostLineTicks >= LOST_LINE_DEAD_END_TICKS)
             {
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
@@ -990,15 +1016,10 @@ int main(void)
                 }
                 turnAroundToLine();
                 lastDirection = 1;
-                clearResult = waitUntilNormalLine(&lastDirection, 1);
+                clearResult = waitUntilNormalLine(&lastDirection);
                 driveForwardTicks(5);
-                if (clearResult == 2)
-                {
-                    targetFound = 1;
-                    mode = MODE_TARGET_FOUND;
-                    break;
-                }
                 intersectionArmed = clearResult;
+                rearmNormalTicks = 0;
                 junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                 leds(LED_EXPLORING);
                 continue;
@@ -1071,14 +1092,9 @@ int main(void)
                         else if (chosenMove == 'R')
                             lastDirection = 1;
 
-                        clearResult = waitUntilNormalLine(&lastDirection, 1);
-                        if (clearResult == 2)
-                        {
-                            targetFound = 1;
-                            mode = MODE_TARGET_FOUND;
-                            break;
-                        }
+                        clearResult = waitUntilNormalLine(&lastDirection);
                         intersectionArmed = clearResult;
+                        rearmNormalTicks = 0;
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
                     }
                     leds(LED_EXPLORING);
