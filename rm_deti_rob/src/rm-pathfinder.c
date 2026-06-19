@@ -7,6 +7,7 @@
 #define INTERSECTION_SPEED 30
 
 #define INTERSECTION_APPROACH_TICKS 8
+#define SENSOR_TO_AXLE_ALIGN_TICKS 5
 #define LEFT_TURN_MIN_TICKS 5
 #define LEFT_TURN_MAX_TICKS 100
 #define RIGHT_TURN_MIN_TICKS 8
@@ -780,11 +781,20 @@ static void executeReturnMove(char move)
     printf("Return move: %c\n", move);
 
     if (move == 'L')
+    {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         turnLeftToLine();
+    }
     else if (move == 'R')
+    {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         turnRightToLine();
+    }
     else if (move == 'B')
+    {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         turnAroundToLine();
+    }
     else if (move == 'S')
         driveForwardTicks(INTERSECTION_APPROACH_TICKS);
 }
@@ -794,15 +804,20 @@ static int executeExplorationMove(char move)
     printf("Exploration move: %c\n", move);
 
     if (move == 'L')
+    {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         return turnLeftToLine();
+    }
 
     if (move == 'R')
     {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         turnRightToLine();
         return 1;
     }
     if (move == 'B')
     {
+        driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
         turnAroundToLine();
         return 1;
     }
