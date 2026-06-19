@@ -16,12 +16,12 @@
 #define TURN_AROUND_MAX_TICKS 100
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-/* Confirmed from log: target=30 ticks, normal intersections max=6 ticks.
-   Threshold of 10 gives comfortable margin above noise. */
-#define TARGET_WIDTH_MIN_TICKS 6
-/* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
-   Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
-#define TARGET_FULL_MASK_MIN_TICKS 6
+/* Width-only confirmation must stay above normal intersections. Compact
+   rectangular targets are accepted by combining width with sensor shape. */
+#define TARGET_WIDTH_MIN_TICKS 10
+#define TARGET_COMPACT_WIDTH_MIN_TICKS 6
+#define TARGET_FULL_MASK_MIN_TICKS 4
+#define TARGET_WIDE_MASK_MIN_TICKS 5
 #define TARGET_BACKUP_MAX_TICKS 20
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
@@ -77,6 +77,7 @@ static int returnPathOverflow = 0;
    so widthTicks alone (which stops counting when the center sensor clears)
    misses it. This counter lets main() apply a second detection criterion. */
 static int lastFullMaskTicks = 0;
+static int lastWideMaskTicks = 0;
 
 typedef enum
 {
@@ -481,7 +482,8 @@ static char chooseExplorationMove(unsigned int sensors)
  *
  * Strategy: drive forward slowly and count two things simultaneously:
  *   widthTicks    = total ticks isLineWidthReading() stays true
- *   fullMaskTicks = ticks where all 5 sensors fired (11111)
+ *   fullMaskTicks = longest run where all 5 sensors fired (11111)
+ *   wideMaskTicks = longest run where at least 4 sensors fired
  *
  * Stop the scan as soon as either target threshold is reached. The target is
  * a transverse block, so continuing to measure the full width can push the
@@ -493,9 +495,11 @@ static int measureLineWidthTicks(unsigned int firstSensors)
 {
     int widthTicks = 0;
     int fullMaskRun = 0;
+    int wideMaskRun = 0;
     unsigned int sensors = firstSensors & SENSOR_MASK;
 
     lastFullMaskTicks = 0;
+    lastWideMaskTicks = 0;
 
     setVel2(LINE_WIDTH_SCAN_SPEED, LINE_WIDTH_SCAN_SPEED);
     while (!stopButton() && widthTicks < LINE_WIDTH_SCAN_MAX_TICKS && isLineWidthReading(sensors))
@@ -512,10 +516,24 @@ static int measureLineWidthTicks(unsigned int firstSensors)
             fullMaskRun = 0;
         }
 
+        if (activeSensorCount(sensors) >= 4)
+        {
+            wideMaskRun++;
+            if (wideMaskRun > lastWideMaskTicks)
+                lastWideMaskTicks = wideMaskRun;
+        }
+        else
+        {
+            wideMaskRun = 0;
+        }
+
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
 
-        if (widthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
+        if (widthTicks >= TARGET_WIDTH_MIN_TICKS ||
+            (widthTicks >= TARGET_COMPACT_WIDTH_MIN_TICKS &&
+             lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS &&
+             lastWideMaskTicks >= TARGET_WIDE_MASK_MIN_TICKS))
             break;
     }
     setVel2(0, 0);
@@ -524,6 +542,8 @@ static int measureLineWidthTicks(unsigned int firstSensors)
     printInt(widthTicks, 10);
     printf(" fullMask=");
     printInt(lastFullMaskTicks, 10);
+    printf(" wideMask=");
+    printInt(lastWideMaskTicks, 10);
     printf("\n");
 
     return widthTicks;
@@ -546,6 +566,8 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     printInt(widthTicks, 10);
     printf(" fullMask=");
     printInt(lastFullMaskTicks, 10);
+    printf(" wideMask=");
+    printInt(lastWideMaskTicks, 10);
     printf("\n");
     printCurrentPose("Target pose");
     printPath();
@@ -1068,12 +1090,15 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    /* TARGET DETECTION: dual-condition check.
-                       Accept target if widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
-                       OR fullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5).
-                       Confirmed from logs: target=26-30 ticks, normal max=6.
-                       Both thresholds are well above intersection noise. */
-                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
+                    /* TARGET DETECTION:
+                       - long measured width is enough by itself;
+                       - compact rectangular markers need sustained broad
+                         sensor coverage, so width=6 intersections do not
+                         become false targets. */
+                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS ||
+                        (lineWidthTicks >= TARGET_COMPACT_WIDTH_MIN_TICKS &&
+                         lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS &&
+                         lastWideMaskTicks >= TARGET_WIDE_MASK_MIN_TICKS))
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
