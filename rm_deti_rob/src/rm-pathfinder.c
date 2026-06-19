@@ -11,9 +11,10 @@
 #define LEFT_TURN_MIN_TICKS 12
 #define LEFT_TURN_MAX_TICKS 100
 #define RIGHT_TURN_MIN_TICKS 12
-#define RIGHT_TURN_MAX_TICKS 70
+#define RIGHT_TURN_MAX_TICKS 100
 #define TURN_AROUND_MIN_TICKS 20
 #define TURN_AROUND_MAX_TICKS 100
+#define TURN_AROUND_EXTENDED_MAX_TICKS 160
 #define TURN_CENTER_LOST_TICKS 2
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
@@ -31,10 +32,11 @@
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define JUNCTION_REARM_COOLDOWN_TICKS 10
-#define BRANCH_PROBE_MAX_TICKS 22
-#define BRANCH_PROBE_SETTLE_TICKS 5
-#define BRANCH_PROBE_MIN_LINE_TICKS 5
-#define BRANCH_PROBE_LOST_TICKS 5
+#define BRANCH_PROBE_MAX_TICKS 70
+#define BRANCH_PROBE_SETTLE_TICKS 8
+#define BRANCH_PROBE_MIN_LINE_TICKS 30
+#define BRANCH_PROBE_MIN_NEXT_JUNCTION_TICKS 14
+#define BRANCH_PROBE_LOST_TICKS 4
 #define BRANCH_PROBE_BACKUP_EXTRA_TICKS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
@@ -45,7 +47,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v32-strict-branch-confirm"
+#define CODE_VERSION "probe-target-v42-recovery-guard"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -84,6 +86,9 @@ static int returnPathOverflow = 0;
    so widthTicks alone (which stops counting when the center sensor clears)
    misses it. This counter lets main() apply a second detection criterion. */
 static int lastFullMaskTicks = 0;
+static int lastProbeEndedAtIntersection = 0;
+static int afterDeadEndBacktrack = 0;
+static char lastDeadEndEntryMove = '\0';
 
 typedef enum
 {
@@ -126,6 +131,20 @@ static void recordMove(char move)
     pathMemory[pathLength] = move;
     pathLength++;
     pathMemory[pathLength] = '\0';
+}
+
+static char directDeadEndEntryMove(void)
+{
+    char move;
+
+    if (pathLength == 0)
+        return '\0';
+
+    move = pathMemory[pathLength - 1];
+    if (move == 'L' || move == 'S' || move == 'R')
+        return move;
+
+    return '\0';
 }
 
 static int moveToDegrees(char move)
@@ -766,7 +785,7 @@ static int turnRightToLine(void)
     return 0;
 }
 
-static int turnAroundToLine(void)
+static int turnAroundToLineWithMax(int maxTicks)
 {
     int ticks = 0;
     int centerLostTicks = 0;
@@ -774,7 +793,7 @@ static int turnAroundToLine(void)
 
     setVel2(TURN_SPEED, -TURN_SPEED);
 
-    while (!stopButton() && ticks < TURN_AROUND_MAX_TICKS)
+    while (!stopButton() && ticks < maxTicks)
     {
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
@@ -794,6 +813,25 @@ static int turnAroundToLine(void)
 
     setVel2(0, 0);
     return 0;
+}
+
+static int turnAroundToLine(void)
+{
+    return turnAroundToLineWithMax(TURN_AROUND_MAX_TICKS);
+}
+
+static int turnAroundToLineExtended(void)
+{
+    return turnAroundToLineWithMax(TURN_AROUND_EXTENDED_MAX_TICKS);
+}
+
+static int turnAroundToLineRobust(char *label)
+{
+    if (turnAroundToLine())
+        return 1;
+
+    printf("%s extended turn\n", label);
+    return turnAroundToLineExtended();
 }
 
 static void executeReturnMove(char move)
@@ -836,7 +874,7 @@ static int moveIntoBranch(char move)
     if (move == 'B')
     {
         driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        return turnAroundToLine();
+        return turnAroundToLineRobust("Probe B");
     }
 
     if (move == 'S')
@@ -876,6 +914,13 @@ static int confirmBranchLine(int *lastDirection, int *probeTicks)
         else
         {
             lostTicks = 0;
+            if (ticks > BRANCH_PROBE_MIN_NEXT_JUNCTION_TICKS && isIntersectionCandidate(sensors))
+            {
+                lastProbeEndedAtIntersection = 1;
+                setVel2(0, 0);
+                return 1;
+            }
+
             if (ticks > BRANCH_PROBE_SETTLE_TICKS && isNormalLine(sensors))
             {
                 consecutiveLineTicks++;
@@ -898,9 +943,10 @@ static int confirmBranchLine(int *lastDirection, int *probeTicks)
     return 0;
 }
 
-static void recoverFailedProbe(char move, int probeTicks)
+static int recoverFailedProbe(char move, int probeTicks)
 {
     int backupTicks = probeTicks + BRANCH_PROBE_BACKUP_EXTRA_TICKS;
+    int recovered = 1;
 
     printf("Recover probe %c backup=", move);
     printInt(backupTicks, 10);
@@ -909,32 +955,34 @@ static void recoverFailedProbe(char move, int probeTicks)
     if (move == 'S')
     {
         driveBackwardTicks(INTERSECTION_APPROACH_TICKS + backupTicks);
-        return;
+        return 1;
     }
 
     if (move == 'L')
     {
         driveBackwardTicks(backupTicks);
-        turnRightToLine();
+        recovered = turnRightToLine();
         driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        return;
+        return recovered;
     }
 
     if (move == 'R')
     {
         driveBackwardTicks(backupTicks);
-        turnLeftToLine();
+        recovered = turnLeftToLine();
         driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        return;
+        return recovered;
     }
 
     if (move == 'B')
     {
         driveBackwardTicks(backupTicks);
-        turnAroundToLine();
+        recovered = turnAroundToLineRobust("Recover B");
         driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        return;
+        return recovered;
     }
+
+    return 0;
 }
 
 static int probeMove(char move, int *lastDirection)
@@ -947,7 +995,12 @@ static int probeMove(char move, int *lastDirection)
     if (!moveIntoBranch(move))
     {
         printf("Probe %c rejected: turn failed\n", move);
-        recoverFailedProbe(move, 0);
+        if (!recoverFailedProbe(move, 0))
+        {
+            printf("Probe %c recovery failed\n", move);
+            *lastDirection = savedDirection;
+            return -1;
+        }
 
         *lastDirection = savedDirection;
         return 0;
@@ -971,7 +1024,12 @@ static int probeMove(char move, int *lastDirection)
     printf("Probe %c rejected: no stable line ticks=", move);
     printInt(probeTicks, 10);
     printf("\n");
-    recoverFailedProbe(move, probeTicks);
+    if (!recoverFailedProbe(move, probeTicks))
+    {
+        printf("Probe %c recovery failed\n", move);
+        *lastDirection = savedDirection;
+        return -1;
+    }
 
     *lastDirection = savedDirection;
     return 0;
@@ -979,9 +1037,34 @@ static int probeMove(char move, int *lastDirection)
 
 static int activeProbeExplorationMove(char *chosenMove, int *lastDirection)
 {
-    char candidates[4] = {'L', 'S', 'R', 'B'};
-    int candidateCount = 4;
+    char baseCandidates[4] = {'L', 'S', 'R', 'B'};
+    char candidates[4];
+    char skipMove = '\0';
+    int candidateCount = 0;
+    int probeResult = 0;
     int i;
+
+    lastProbeEndedAtIntersection = 0;
+
+    if (afterDeadEndBacktrack && lastDeadEndEntryMove != '\0')
+    {
+        /* After returning from a dead-end, the failed branch is behind the
+           robot at the parent junction, regardless of the original entry
+           move. Skipping B prevents immediately going back into it. */
+        skipMove = 'B';
+        printf("Backtrack-aware probe entry=");
+        printf("%c skip=", lastDeadEndEntryMove);
+        printf("%c\n", skipMove);
+    }
+
+    for (i = 0; i < 4; i++)
+    {
+        if (baseCandidates[i] == skipMove)
+            continue;
+
+        candidates[candidateCount] = baseCandidates[i];
+        candidateCount++;
+    }
 
     printf("Probe order:");
     for (i = 0; i < candidateCount; i++)
@@ -990,9 +1073,15 @@ static int activeProbeExplorationMove(char *chosenMove, int *lastDirection)
 
     for (i = 0; i < candidateCount; i++)
     {
-        if (probeMove(candidates[i], lastDirection))
+        probeResult = probeMove(candidates[i], lastDirection);
+
+        if (probeResult < 0)
+            return 0;
+
+        if (probeResult)
         {
             *chosenMove = candidates[i];
+            afterDeadEndBacktrack = 0;
             printf("Exploration move selected: %c\n", *chosenMove);
             return 1;
         }
@@ -1145,6 +1234,8 @@ int main(void)
         lostLineTicks = 0;
         junctionCooldownTicks = 0;
         rearmNormalTicks = 0;
+        afterDeadEndBacktrack = 0;
+        lastDeadEndEntryMove = '\0';
         resetPath();
         resetOptimizedPath();
         resetReturnPath();
@@ -1193,6 +1284,13 @@ int main(void)
                 leds(LED_INTERSECTION);
                 printf("Dead end detected\n");
                 lostLineTicks = 0;
+                lastDeadEndEntryMove = directDeadEndEntryMove();
+                printf("Dead end entry move: ");
+                if (lastDeadEndEntryMove == '\0')
+                    printf("none");
+                else
+                    printf("%c", lastDeadEndEntryMove);
+                printf("\n");
                 recordMove('B');
                 if (pathOverflow)
                 {
@@ -1200,8 +1298,14 @@ int main(void)
                     printf("[ERROR] Path memory overflow - map too large\n");
                     break;
                 }
-                turnAroundToLine();
+                if (!turnAroundToLineRobust("Dead end"))
+                {
+                    setVel2(0, 0);
+                    printf("Dead end turn failed; stopping\n");
+                    break;
+                }
                 lastDirection = 1;
+                afterDeadEndBacktrack = 1;
                 clearResult = waitUntilNormalLine(&lastDirection);
                 driveForwardTicks(5);
                 intersectionArmed = clearResult;
@@ -1272,10 +1376,22 @@ int main(void)
                         else if (chosenMove == 'R')
                             lastDirection = 1;
 
-                        clearResult = waitUntilNormalLine(&lastDirection);
-                        intersectionArmed = clearResult;
-                        rearmNormalTicks = 0;
-                        junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                        if (lastProbeEndedAtIntersection)
+                        {
+                            printf("Probe ended at next intersection\n");
+                            intersectionArmed = 1;
+                            intersectionHistory = 0;
+                            intersectionHitTicks = 0;
+                            rearmNormalTicks = 0;
+                            junctionCooldownTicks = 0;
+                        }
+                        else
+                        {
+                            clearResult = waitUntilNormalLine(&lastDirection);
+                            intersectionArmed = clearResult;
+                            rearmNormalTicks = 0;
+                            junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
+                        }
                     }
                     leds(LED_EXPLORING);
                     continue;
