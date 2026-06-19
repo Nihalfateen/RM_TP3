@@ -1,34 +1,41 @@
 #include "rm-mr32.h"
 
-#define BASE_SPEED 40
-#define TURN_GAIN 7
-#define SEARCH_SPEED 25
-#define TURN_SPEED 30
-#define INTERSECTION_SPEED 30
+#define BASE_SPEED 30
+#define TURN_GAIN 6
+#define SEARCH_SPEED 20
+#define TURN_SPEED 25
+#define INTERSECTION_SPEED 20
 
 #define INTERSECTION_APPROACH_TICKS 8
 #define SENSOR_TO_AXLE_ALIGN_TICKS 5
-#define LEFT_TURN_MIN_TICKS 5
+#define LEFT_TURN_MIN_TICKS 12
 #define LEFT_TURN_MAX_TICKS 100
-#define RIGHT_TURN_MIN_TICKS 8
+#define RIGHT_TURN_MIN_TICKS 12
 #define RIGHT_TURN_MAX_TICKS 70
 #define TURN_AROUND_MIN_TICKS 20
 #define TURN_AROUND_MAX_TICKS 100
+#define TURN_CENTER_LOST_TICKS 2
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-/* Confirmed from log: target=30 ticks, normal intersections max=6 ticks.
-   Threshold of 10 gives comfortable margin above noise. */
-#define TARGET_WIDTH_MIN_TICKS 10
+/* Width-only target confirmation must stay above ordinary intersections.
+   With slow active probing, normal intersections can reach 10 ticks with
+   fullMask=0, so width alone needs a larger margin. */
+#define TARGET_WIDTH_MIN_TICKS 18
 /* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
    Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
 #define TARGET_FULL_MASK_MIN_TICKS 5
 #define TARGET_BACKUP_MAX_TICKS 20
-#define LINE_WIDTH_SCAN_SPEED 15
+#define LINE_WIDTH_SCAN_SPEED 12
 #define INTERSECTION_CLEAR_TICKS 8
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define JUNCTION_REARM_COOLDOWN_TICKS 10
+#define BRANCH_PROBE_MAX_TICKS 22
+#define BRANCH_PROBE_SETTLE_TICKS 5
+#define BRANCH_PROBE_MIN_LINE_TICKS 5
+#define BRANCH_PROBE_LOST_TICKS 5
+#define BRANCH_PROBE_BACKUP_EXTRA_TICKS 2
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
 /* FIX BUG-05: reduced from 850 to 300 mm. 850 caused the robot to stop
@@ -38,7 +45,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v21-target-stop-center"
+#define CODE_VERSION "probe-target-v32-strict-branch-confirm"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -459,25 +466,12 @@ static int isIntersectionCandidate(unsigned int sensors)
     return 0;
 }
 
-static char chooseExplorationMove(unsigned int sensors)
-{
-    sensors &= SENSOR_MASK;
-
-    if (hasLeftPath(sensors))
-        return 'L';
-    if (hasForwardPath(sensors))
-        return 'S';
-    if (hasRightPath(sensors))
-        return 'R';
-
-    return 'B';
-}
-
 /* measureLineWidthTicks() — forward scan with full-mask counter.
  *
  * Physical test confirmed:
- *   - Target block  → widthTicks ~30, sensors hit 11111 repeatedly
- *   - Normal junctions → widthTicks 1-6, fullMask 0-2
+ *   - Target block  → wide reading or sustained 11111 full mask
+ *   - Normal junctions with slow probing can reach widthTicks ~10, but
+ *     without sustained fullMask
  *
  * Strategy: drive forward slowly and count two things simultaneously:
  *   widthTicks    = total ticks isLineWidthReading() stays true
@@ -487,7 +481,7 @@ static char chooseExplorationMove(unsigned int sensors)
  * a transverse block, so continuing to measure the full width can push the
  * robot past the marker before it enters MODE_TARGET_FOUND.
  *
- * Both thresholds are well above normal intersection noise (max 6/2).
+ * Width-only confirmation is deliberately stricter than the full-mask path.
  */
 static int measureLineWidthTicks(unsigned int firstSensors)
 {
@@ -713,6 +707,7 @@ static int waitUntilNormalLine(int *lastDirection)
 static int turnLeftToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(-TURN_SPEED, TURN_SPEED);
@@ -723,10 +718,17 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            setVel2(0, 0);
-            return 1;
+            if (ticks >= LEFT_TURN_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+            {
+                setVel2(0, 0);
+                return 1;
+            }
+        }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+        {
+            centerLostTicks++;
         }
     }
 
@@ -734,9 +736,10 @@ static int turnLeftToLine(void)
     return 0;
 }
 
-static void turnRightToLine(void)
+static int turnRightToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -747,18 +750,26 @@ static void turnRightToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            break;
+            if (ticks >= RIGHT_TURN_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+            {
+                setVel2(0, 0);
+                return 1;
+            }
         }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+            centerLostTicks++;
     }
 
     setVel2(0, 0);
+    return 0;
 }
 
-static void turnAroundToLine(void)
+static int turnAroundToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -769,13 +780,20 @@ static void turnAroundToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            break;
+            if (ticks >= TURN_AROUND_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+            {
+                setVel2(0, 0);
+                return 1;
+            }
         }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+            centerLostTicks++;
     }
 
     setVel2(0, 0);
+    return 0;
 }
 
 static void executeReturnMove(char move)
@@ -801,10 +819,8 @@ static void executeReturnMove(char move)
         driveForwardTicks(INTERSECTION_APPROACH_TICKS);
 }
 
-static int executeExplorationMove(char move)
+static int moveIntoBranch(char move)
 {
-    printf("Exploration move: %c\n", move);
-
     if (move == 'L')
     {
         driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
@@ -814,19 +830,172 @@ static int executeExplorationMove(char move)
     if (move == 'R')
     {
         driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        turnRightToLine();
-        return 1;
+        return turnRightToLine();
     }
+
     if (move == 'B')
     {
         driveForwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
-        turnAroundToLine();
-        return 1;
+        return turnAroundToLine();
     }
+
     if (move == 'S')
     {
         driveForwardTicks(INTERSECTION_APPROACH_TICKS);
         return 1;
+    }
+
+    return 0;
+}
+
+static int confirmBranchLine(int *lastDirection, int *probeTicks)
+{
+    int ticks = 0;
+    int consecutiveLineTicks = 0;
+    int lostTicks = 0;
+    unsigned int sensors;
+
+    *probeTicks = 0;
+
+    while (!stopButton() && ticks < BRANCH_PROBE_MAX_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+        ticks++;
+        *probeTicks = ticks;
+
+        if (sensors == 0)
+        {
+            lostTicks++;
+            if (lostTicks >= BRANCH_PROBE_LOST_TICKS)
+            {
+                setVel2(0, 0);
+                return 0;
+            }
+        }
+        else
+        {
+            lostTicks = 0;
+            if (ticks > BRANCH_PROBE_SETTLE_TICKS && isNormalLine(sensors))
+            {
+                consecutiveLineTicks++;
+                if (consecutiveLineTicks >= BRANCH_PROBE_MIN_LINE_TICKS)
+                {
+                    setVel2(0, 0);
+                    return 1;
+                }
+            }
+            else
+            {
+                consecutiveLineTicks = 0;
+            }
+        }
+
+        followLine(sensors, lastDirection);
+    }
+
+    setVel2(0, 0);
+    return 0;
+}
+
+static void recoverFailedProbe(char move, int probeTicks)
+{
+    int backupTicks = probeTicks + BRANCH_PROBE_BACKUP_EXTRA_TICKS;
+
+    printf("Recover probe %c backup=", move);
+    printInt(backupTicks, 10);
+    printf("\n");
+
+    if (move == 'S')
+    {
+        driveBackwardTicks(INTERSECTION_APPROACH_TICKS + backupTicks);
+        return;
+    }
+
+    if (move == 'L')
+    {
+        driveBackwardTicks(backupTicks);
+        turnRightToLine();
+        driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
+        return;
+    }
+
+    if (move == 'R')
+    {
+        driveBackwardTicks(backupTicks);
+        turnLeftToLine();
+        driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
+        return;
+    }
+
+    if (move == 'B')
+    {
+        driveBackwardTicks(backupTicks);
+        turnAroundToLine();
+        driveBackwardTicks(SENSOR_TO_AXLE_ALIGN_TICKS);
+        return;
+    }
+}
+
+static int probeMove(char move, int *lastDirection)
+{
+    int savedDirection = *lastDirection;
+    int probeTicks = 0;
+
+    printf("Probe move: %c\n", move);
+
+    if (!moveIntoBranch(move))
+    {
+        printf("Probe %c rejected: turn failed\n", move);
+        recoverFailedProbe(move, 0);
+
+        *lastDirection = savedDirection;
+        return 0;
+    }
+
+    if (move == 'L')
+        *lastDirection = -1;
+    else if (move == 'R')
+        *lastDirection = 1;
+    else if (move == 'B')
+        *lastDirection = 1;
+
+    if (confirmBranchLine(lastDirection, &probeTicks))
+    {
+        printf("Probe %c accepted ticks=", move);
+        printInt(probeTicks, 10);
+        printf("\n");
+        return 1;
+    }
+
+    printf("Probe %c rejected: no stable line ticks=", move);
+    printInt(probeTicks, 10);
+    printf("\n");
+    recoverFailedProbe(move, probeTicks);
+
+    *lastDirection = savedDirection;
+    return 0;
+}
+
+static int activeProbeExplorationMove(char *chosenMove, int *lastDirection)
+{
+    char candidates[4] = {'L', 'S', 'R', 'B'};
+    int candidateCount = 4;
+    int i;
+
+    printf("Probe order:");
+    for (i = 0; i < candidateCount; i++)
+        printf(" %c", candidates[i]);
+    printf("\n");
+
+    for (i = 0; i < candidateCount; i++)
+    {
+        if (probeMove(candidates[i], lastDirection))
+        {
+            *chosenMove = candidates[i];
+            printf("Exploration move selected: %c\n", *chosenMove);
+            return 1;
+        }
     }
 
     return 0;
@@ -1066,11 +1235,10 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    /* TARGET DETECTION: dual-condition check.
-                       Accept target if widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
-                       OR fullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5).
-                       Confirmed from logs: target=26-30 ticks, normal max=6.
-                       Both thresholds are well above intersection noise. */
+                    /* TARGET DETECTION: accept a sustained all-sensors marker,
+                       or a much wider-than-normal marker. Slow probing made
+                       ordinary junctions reach width=10/fullMask=0, so width
+                       alone is intentionally stricter. */
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
                     {
                         targetFound = 1;
@@ -1080,20 +1248,15 @@ int main(void)
                         break;
                     }
 
-                    driveBackwardTicks(clamp(lineWidthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
+                    driveBackwardTicks(clamp(lineWidthTicks, 0, TARGET_BACKUP_MAX_TICKS));
 
                     if (!stopButton())
                     {
-                        chosenMove = chooseExplorationMove(junctionSensors);
-                        if (!executeExplorationMove(chosenMove))
+                        if (!activeProbeExplorationMove(&chosenMove, &lastDirection))
                         {
-                            printf("Exploration move failed; retrying\n");
-                            if (!executeExplorationMove(chosenMove))
-                            {
-                                setVel2(0, 0);
-                                printf("Exploration move failed twice; stopping\n");
-                                break;
-                            }
+                            setVel2(0, 0);
+                            printf("Active probing failed; stopping\n");
+                            break;
                         }
 
                         recordMove(chosenMove);
