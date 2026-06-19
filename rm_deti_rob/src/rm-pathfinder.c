@@ -29,6 +29,8 @@
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
 #define JUNCTION_REARM_COOLDOWN_TICKS 10
+#define JUNCTION_DECISION_SAMPLES 5
+#define JUNCTION_DECISION_MIN_HITS 3
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
 /* FIX BUG-05: reduced from 850 to 300 mm. 850 caused the robot to stop
@@ -38,7 +40,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v21-target-stop-center"
+#define CODE_VERSION "probe-target-v22-stable-junction-decision"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -459,18 +461,98 @@ static int isIntersectionCandidate(unsigned int sensors)
     return 0;
 }
 
-static char chooseExplorationMove(unsigned int sensors)
+static unsigned int sampleStableJunctionSensors(void)
+{
+    int i;
+    int left2Hits = 0;
+    int left1Hits = 0;
+    int centerHits = 0;
+    int right1Hits = 0;
+    int right2Hits = 0;
+    unsigned int sensors;
+    unsigned int stableSensors = 0;
+
+    for (i = 0; i < JUNCTION_DECISION_SAMPLES && !stopButton(); i++)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+
+        if (sensors & SENSOR_LEFT_2)
+            left2Hits++;
+        if (sensors & SENSOR_LEFT_1)
+            left1Hits++;
+        if (sensors & SENSOR_CENTER)
+            centerHits++;
+        if (sensors & SENSOR_RIGHT_1)
+            right1Hits++;
+        if (sensors & SENSOR_RIGHT_2)
+            right2Hits++;
+    }
+
+    if (left2Hits >= JUNCTION_DECISION_MIN_HITS)
+        stableSensors |= SENSOR_LEFT_2;
+    if (left1Hits >= JUNCTION_DECISION_MIN_HITS)
+        stableSensors |= SENSOR_LEFT_1;
+    if (centerHits >= JUNCTION_DECISION_MIN_HITS)
+        stableSensors |= SENSOR_CENTER;
+    if (right1Hits >= JUNCTION_DECISION_MIN_HITS)
+        stableSensors |= SENSOR_RIGHT_1;
+    if (right2Hits >= JUNCTION_DECISION_MIN_HITS)
+        stableSensors |= SENSOR_RIGHT_2;
+
+    return stableSensors;
+}
+
+static int hasConfirmedLeftPath(unsigned int sensors, int widthTicks)
 {
     sensors &= SENSOR_MASK;
 
-    if (hasLeftPath(sensors))
+    if (sensors & SENSOR_LEFT_2)
+        return 1;
+
+    if ((sensors & SENSOR_LEFT_1) && widthTicks >= 2 && activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS)
+        return 1;
+
+    return 0;
+}
+
+static int hasConfirmedRightPath(unsigned int sensors, int widthTicks)
+{
+    sensors &= SENSOR_MASK;
+
+    if (sensors & SENSOR_RIGHT_2)
+        return 1;
+
+    if ((sensors & SENSOR_RIGHT_1) && widthTicks >= 2 && activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS)
+        return 1;
+
+    return 0;
+}
+
+static char chooseExplorationMove(unsigned int firstSensors, unsigned int stableSensors, int widthTicks)
+{
+    unsigned int decisionSensors = stableSensors & SENSOR_MASK;
+
+    if (decisionSensors == 0)
+        decisionSensors = firstSensors & SENSOR_MASK;
+
+    if (hasConfirmedLeftPath(decisionSensors, widthTicks))
         return 'L';
-    if (hasForwardPath(sensors))
+    if (hasForwardPath(decisionSensors))
         return 'S';
-    if (hasRightPath(sensors))
+    if (hasConfirmedRightPath(decisionSensors, widthTicks))
         return 'R';
 
     return 'B';
+}
+
+static void printDecisionSensors(unsigned int firstSensors, unsigned int stableSensors, char move)
+{
+    printf("Decision raw=");
+    printInt(firstSensors & SENSOR_MASK, 2 | 5 << 16);
+    printf(" stable=");
+    printInt(stableSensors & SENSOR_MASK, 2 | 5 << 16);
+    printf(" move=%c\n", move);
 }
 
 /* measureLineWidthTicks() — forward scan with full-mask counter.
@@ -935,6 +1017,7 @@ int main(void)
 {
     unsigned int sensors;
     unsigned int junctionSensors;
+    unsigned int stableJunctionSensors;
     int lastDirection = 1;
     int intersectionArmed = 1;
     int intersectionHistory = 0;
@@ -1084,7 +1167,10 @@ int main(void)
 
                     if (!stopButton())
                     {
-                        chosenMove = chooseExplorationMove(junctionSensors);
+                        stableJunctionSensors = sampleStableJunctionSensors();
+                        chosenMove = chooseExplorationMove(junctionSensors, stableJunctionSensors, lineWidthTicks);
+                        printDecisionSensors(junctionSensors, stableJunctionSensors, chosenMove);
+
                         if (!executeExplorationMove(chosenMove))
                         {
                             printf("Exploration move failed; retrying\n");
