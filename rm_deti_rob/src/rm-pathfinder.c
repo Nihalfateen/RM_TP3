@@ -17,9 +17,10 @@
 #define TURN_CENTER_LOST_TICKS 2
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-/* Confirmed from log: target=30 ticks, normal intersections max=6 ticks.
-   Threshold of 10 gives comfortable margin above noise. */
-#define TARGET_WIDTH_MIN_TICKS 10
+/* Width-only target confirmation must stay above ordinary intersections.
+   With slow active probing, normal intersections can reach 10 ticks with
+   fullMask=0, so width alone needs a larger margin. */
+#define TARGET_WIDTH_MIN_TICKS 18
 /* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
    Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
 #define TARGET_FULL_MASK_MIN_TICKS 5
@@ -43,7 +44,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v30-unified-probe-recovery"
+#define CODE_VERSION "probe-target-v31-strict-target-width"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -467,8 +468,9 @@ static int isIntersectionCandidate(unsigned int sensors)
 /* measureLineWidthTicks() — forward scan with full-mask counter.
  *
  * Physical test confirmed:
- *   - Target block  → widthTicks ~30, sensors hit 11111 repeatedly
- *   - Normal junctions → widthTicks 1-6, fullMask 0-2
+ *   - Target block  → wide reading or sustained 11111 full mask
+ *   - Normal junctions with slow probing can reach widthTicks ~10, but
+ *     without sustained fullMask
  *
  * Strategy: drive forward slowly and count two things simultaneously:
  *   widthTicks    = total ticks isLineWidthReading() stays true
@@ -478,7 +480,7 @@ static int isIntersectionCandidate(unsigned int sensors)
  * a transverse block, so continuing to measure the full width can push the
  * robot past the marker before it enters MODE_TARGET_FOUND.
  *
- * Both thresholds are well above normal intersection noise (max 6/2).
+ * Width-only confirmation is deliberately stricter than the full-mask path.
  */
 static int measureLineWidthTicks(unsigned int firstSensors)
 {
@@ -1228,11 +1230,10 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    /* TARGET DETECTION: dual-condition check.
-                       Accept target if widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
-                       OR fullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5).
-                       Confirmed from logs: target=26-30 ticks, normal max=6.
-                       Both thresholds are well above intersection noise. */
+                    /* TARGET DETECTION: accept a sustained all-sensors marker,
+                       or a much wider-than-normal marker. Slow probing made
+                       ordinary junctions reach width=10/fullMask=0, so width
+                       alone is intentionally stricter. */
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
                     {
                         targetFound = 1;
