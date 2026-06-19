@@ -18,7 +18,7 @@
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 /* Confirmed from log: target=30 ticks, normal intersections max=6 ticks.
    Threshold of 10 gives comfortable margin above noise. */
-#define TARGET_WIDTH_MIN_TICKS 10
+#define TARGET_WIDTH_MIN_TICKS 7
 /* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
    Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
 #define TARGET_FULL_MASK_MIN_TICKS 5
