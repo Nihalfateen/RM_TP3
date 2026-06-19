@@ -16,7 +16,9 @@
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 #define TARGET_WIDTH_MIN_TICKS 18
-#define TARGET_FULL_MASK_MIN_TICKS 8
+/* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
+   Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
+#define TARGET_FULL_MASK_MIN_TICKS 5
 #define TARGET_BACKUP_MAX_TICKS 6
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
@@ -26,11 +28,14 @@
 #define JUNCTION_REARM_COOLDOWN_TICKS 10
 #define RETURN_INTERSECTION_DETECT_TICKS 3
 #define LOST_LINE_DEAD_END_TICKS 16
-#define START_REACHED_RADIUS_MM 850
+/* FIX BUG-05: reduced from 850 to 300 mm. 850 caused the robot to stop
+   ~60 cm before the real origin. 300 mm gives encoder-drift tolerance
+   without stopping a full tile early. */
+#define START_REACHED_RADIUS_MM 300
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v15-stuck-fix"
+#define CODE_VERSION "probe-target-v19-fullmask-confirmed"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -62,6 +67,13 @@ static int optimizedPathOverflow = 0;
 static char returnPath[PATH_MAX_MOVES + 1];
 static unsigned int returnPathLength = 0;
 static int returnPathOverflow = 0;
+
+/* FIX BUG-TARGET: tracks how many consecutive ticks all 5 sensors were
+   active during the last measureLineWidthTicks() call. A rectangular
+   block target saturates all sensors even when the forward path is short,
+   so widthTicks alone (which stops counting when the center sensor clears)
+   misses it. This counter lets main() apply a second detection criterion. */
+static int lastFullMaskTicks = 0;
 
 typedef enum
 {
@@ -356,21 +368,18 @@ static void followLine(unsigned int sensors, int *lastDirection)
 static int hasLeftPath(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
-
     return (sensors & LEFT_BRANCH) != 0;
 }
 
 static int hasForwardPath(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
-
     return (sensors & CENTER_BRANCH) != 0;
 }
 
 static int hasRightPath(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
-
     return (sensors & RIGHT_BRANCH) != 0;
 }
 
@@ -397,7 +406,6 @@ static int hasReturnIntersection(unsigned int sensors)
 static int isReturnIntersectionCandidate(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
-
     return isIntersectionCandidate(sensors);
 }
 
@@ -425,7 +433,6 @@ static int isNormalLine(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    // Made more robust: any clean center-focused reading counts
     if (sensors == SENSOR_CENTER)
         return 1;
     if (sensors == (SENSOR_LEFT_1 | SENSOR_CENTER))
@@ -442,7 +449,11 @@ static int isLineWidthReading(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
 
-    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && hasForwardPath(sensors) && (hasLeftPath(sensors) || hasRightPath(sensors));
+    /* FIX BUG-03 (from v16): removed mandatory hasForwardPath() requirement.
+       The target wide line or block can appear at a dead-end where only
+       lateral sensors fire. Requiring activeSensorCount >= 3 and at least
+       one active path sensor is sufficient. */
+    return activeSensorCount(sensors) >= TARGET_MIN_BLACK_SENSORS && (hasLeftPath(sensors) || hasRightPath(sensors) || hasForwardPath(sensors));
 }
 
 static int isIntersectionCandidate(unsigned int sensors)
@@ -475,23 +486,77 @@ static char chooseExplorationMove(unsigned int sensors)
     return 'B';
 }
 
+/* measureLineWidthTicks() — two-phase measurement.
+ *
+ * Physical test confirmed: the target block gives sensors=11111 for ~30
+ * ticks while stationary. Normal intersections fire 3 sensors max and
+ * never sustain all-5. So we use two phases:
+ *
+ * Phase 1 (stationary): count consecutive ticks where sensors==11111.
+ *   If we hit TARGET_FULL_MASK_MIN_TICKS the robot is on the block target.
+ *   We stop early and report — no forward motion needed.
+ *
+ * Phase 2 (forward scan): original behaviour for a traditional wide line.
+ *   Only runs if phase 1 found zero full-mask ticks.
+ *
+ * lastFullMaskTicks is set so the caller can apply the dual-condition check.
+ */
 static int measureLineWidthTicks(unsigned int firstSensors)
 {
     int widthTicks = 0;
+    int fullMaskTicks = 0;
     unsigned int sensors = firstSensors & SENSOR_MASK;
 
-    setVel2(LINE_WIDTH_SCAN_SPEED, LINE_WIDTH_SCAN_SPEED);
-    while (!stopButton() && widthTicks < LINE_WIDTH_SCAN_MAX_TICKS && isLineWidthReading(sensors))
+    lastFullMaskTicks = 0;
+
+    /* ---- Phase 1: stationary full-mask count ---- */
+    setVel2(0, 0);
+    while (!stopButton() && fullMaskTicks < LINE_WIDTH_SCAN_MAX_TICKS)
     {
-        widthTicks++;
+        if ((sensors & SENSOR_MASK) == SENSOR_MASK)
+        {
+            fullMaskTicks++;
+        }
+        else
+        {
+            /* lost full-mask — if we already have enough, stop counting */
+            if (fullMaskTicks > 0)
+                break;
+            /* never had it — skip straight to phase 2 */
+            break;
+        }
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
     }
 
+    lastFullMaskTicks = fullMaskTicks;
+
+    if (fullMaskTicks > 0)
+    {
+        /* block target detected via full-mask — skip forward scan */
+        printf("Line width ticks=0 fullMask=");
+        printInt(fullMaskTicks, 10);
+        printf("\n");
+        return 0; /* widthTicks irrelevant; caller checks lastFullMaskTicks */
+    }
+
+    setVel2(LINE_WIDTH_SCAN_SPEED, LINE_WIDTH_SCAN_SPEED);
+    sensors = firstSensors & SENSOR_MASK;
+    while (!stopButton() && widthTicks < LINE_WIDTH_SCAN_MAX_TICKS && isLineWidthReading(sensors))
+    {
+        widthTicks++;
+        if ((sensors & SENSOR_MASK) == SENSOR_MASK)
+            lastFullMaskTicks++;
+
+        waitTick20ms();
+        sensors = readLineSensors(0) & SENSOR_MASK;
+    }
     setVel2(0, 0);
 
     printf("Line width ticks=");
     printInt(widthTicks, 10);
+    printf(" fullMask=");
+    printInt(lastFullMaskTicks, 10);
     printf("\n");
 
     return widthTicks;
@@ -511,6 +576,8 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
     printf(" width=");
     printInt(widthTicks, 10);
+    printf(" fullMask=");
+    printInt(lastFullMaskTicks, 10);
     printf("\n");
     printCurrentPose("Target pose");
     printPath();
@@ -528,7 +595,8 @@ static int probeTarget(unsigned int sensors, char *source)
         return 0;
 
     widthTicks = measureLineWidthTicks(sensors);
-    if (widthTicks < TARGET_WIDTH_MIN_TICKS)
+
+    if (widthTicks < TARGET_WIDTH_MIN_TICKS && lastFullMaskTicks < TARGET_FULL_MASK_MIN_TICKS)
     {
         driveBackwardTicks(clamp(widthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
         return 0;
@@ -546,6 +614,7 @@ static void driveForwardTicks(int ticks)
     setVel2(INTERSECTION_SPEED, INTERSECTION_SPEED);
     for (i = 0; i < ticks && !stopButton(); i++)
         waitTick20ms();
+    setVel2(0, 0);
 }
 
 static void driveBackwardTicks(int ticks)
@@ -604,7 +673,10 @@ static int followLineUntilStartPose(int *lastDirection)
         if ((sensors & SENSOR_MASK) == 0)
         {
             lostLineTicks++;
-            if (lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
+            /* FIX BUG-06: guard lost-line stop behind RETURN_START_MIN_TICKS.
+               Without this the robot could stop immediately after the last
+               return-path turn while still rotating to find the line. */
+            if (ticks >= RETURN_START_MIN_TICKS && lostLineTicks >= RETURN_START_LOST_LINE_TICKS)
             {
                 printCurrentPose("Stopping at start line end");
                 setVel2(0, 0);
@@ -651,7 +723,6 @@ static int waitUntilNormalLine(int *lastDirection, int detectTarget)
         waitTick20ms();
         sensors = readLineSensors(0);
 
-        // Don't probe for target immediately to avoid getting stuck on the same intersection
         if (detectTarget && totalTicks > 5 && probeTarget(sensors, "while clearing intersection"))
         {
             return 2;
@@ -767,12 +838,9 @@ static int executeExplorationMove(char move)
     printf("Exploration move: %c\n", move);
 
     if (move == 'L')
-    {
         return turnLeftToLine();
-    }
 
     if (move == 'R')
-
     {
         turnRightToLine();
         return 1;
@@ -804,15 +872,14 @@ static int runReturnNavigation(void)
     printf("Return navigation starting\n");
 
     turnAroundToLine();
+
+    driveForwardTicks(INTERSECTION_APPROACH_TICKS);
     intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
 
     while (!stopButton())
     {
         waitTick20ms();
         sensors = readLineSensors(0);
-        printf("S=");
-        printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
-        printf("\n");
 
         if (returnIndex >= returnPathLength)
         {
@@ -856,6 +923,9 @@ static int waitForReturnStart(void)
         waitTick20ms();
 
     while (!startButton() && !stopButton())
+        waitTick20ms();
+
+    while (startButton() && !stopButton())
         waitTick20ms();
 
     return !stopButton();
@@ -978,7 +1048,7 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
-                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || ((junctionSensors & SENSOR_MASK) == SENSOR_MASK && lineWidthTicks >= TARGET_FULL_MASK_MIN_TICKS))
+                    if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
@@ -1041,12 +1111,15 @@ int main(void)
 
         if (targetFound && mode == MODE_TARGET_FOUND)
         {
-            mode = MODE_RETURN;
-            if (runReturnNavigation())
+            if (waitForReturnStart())
             {
-                mode = MODE_FINISHED;
-                leds(LED_TARGET_FOUND);
-                printf("Finished; press stop to reset\n");
+                mode = MODE_RETURN;
+                if (runReturnNavigation())
+                {
+                    mode = MODE_FINISHED;
+                    leds(LED_TARGET_FOUND);
+                    printf("Finished; press stop to reset\n");
+                }
             }
 
             while (!stopButton())
