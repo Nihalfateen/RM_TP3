@@ -14,6 +14,7 @@
 #define RIGHT_TURN_MAX_TICKS 70
 #define TURN_AROUND_MIN_TICKS 20
 #define TURN_AROUND_MAX_TICKS 100
+#define TURN_CENTER_LOST_TICKS 1
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
 /* Width-only confirmation must stay above normal intersections. Compact
@@ -23,8 +24,11 @@
 #define TARGET_FULL_MASK_MIN_TICKS 4
 #define TARGET_WIDE_MASK_MIN_TICKS 5
 #define TARGET_BACKUP_MAX_TICKS 20
+#define TARGET_STOP_BACKUP_TICKS 0
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
+#define LINE_CENTER_STABILIZE_TICKS 6
+#define LINE_CENTER_STABILIZE_MAX_TICKS 40
 #define INTERSECTION_CLEAR_MAX_TICKS 100
 #define INTERSECTION_DEBOUNCE_SAMPLES 3
 #define INTERSECTION_DEBOUNCE_MIN_HITS 2
@@ -38,7 +42,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v21-target-stop-center"
+#define CODE_VERSION "probe-target-v23-turn-reacquire"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -390,6 +394,7 @@ static int hasRightPath(unsigned int sensors)
 static int isNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection);
+static void stabilizeOnCenterLine(int *lastDirection);
 
 static int isReturnIntersectionCandidate(unsigned int sensors)
 {
@@ -684,7 +689,8 @@ static int followLineUntilStartPose(int *lastDirection)
         if (isReturnIntersectionCandidate(sensors))
         {
             driveForwardTicks(INTERSECTION_APPROACH_TICKS);
-            waitUntilNormalLine(lastDirection);
+            if (waitUntilNormalLine(lastDirection))
+                stabilizeOnCenterLine(lastDirection);
             ticks += INTERSECTION_APPROACH_TICKS;
             continue;
         }
@@ -732,9 +738,39 @@ static int waitUntilNormalLine(int *lastDirection)
     return 0;
 }
 
+static void stabilizeOnCenterLine(int *lastDirection)
+{
+    int centerTicks = 0;
+    int totalTicks = 0;
+    unsigned int sensors;
+
+    while (!stopButton() && totalTicks < LINE_CENTER_STABILIZE_MAX_TICKS)
+    {
+        waitTick20ms();
+        sensors = readLineSensors(0);
+        followLine(sensors, lastDirection);
+
+        if ((sensors & SENSOR_CENTER) && isNormalLine(sensors))
+        {
+            centerTicks++;
+            if (centerTicks >= LINE_CENTER_STABILIZE_TICKS)
+                break;
+        }
+        else
+        {
+            centerTicks = 0;
+        }
+
+        totalTicks++;
+    }
+
+    setVel2(0, 0);
+}
+
 static int turnLeftToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(-TURN_SPEED, TURN_SPEED);
@@ -745,10 +781,17 @@ static int turnLeftToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= LEFT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            setVel2(0, 0);
-            return 1;
+            if (ticks >= LEFT_TURN_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+            {
+                setVel2(0, 0);
+                return 1;
+            }
+        }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+        {
+            centerLostTicks++;
         }
     }
 
@@ -759,6 +802,7 @@ static int turnLeftToLine(void)
 static void turnRightToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -769,9 +813,14 @@ static void turnRightToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= RIGHT_TURN_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            break;
+            if (ticks >= RIGHT_TURN_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+                break;
+        }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+        {
+            centerLostTicks++;
         }
     }
 
@@ -781,6 +830,7 @@ static void turnRightToLine(void)
 static void turnAroundToLine(void)
 {
     int ticks = 0;
+    int centerLostTicks = 0;
     unsigned int sensors = 0;
 
     setVel2(TURN_SPEED, -TURN_SPEED);
@@ -791,9 +841,14 @@ static void turnAroundToLine(void)
         sensors = readLineSensors(0) & SENSOR_MASK;
         ticks++;
 
-        if (ticks >= TURN_AROUND_MIN_TICKS && (sensors & SENSOR_CENTER))
+        if (sensors & SENSOR_CENTER)
         {
-            break;
+            if (ticks >= TURN_AROUND_MIN_TICKS && centerLostTicks >= TURN_CENTER_LOST_TICKS)
+                break;
+        }
+        else if (ticks >= TURN_CENTER_LOST_TICKS)
+        {
+            centerLostTicks++;
         }
     }
 
@@ -874,6 +929,8 @@ static int runReturnNavigation(void)
        move is consumed prematurely. */
     driveForwardTicks(INTERSECTION_APPROACH_TICKS);
     intersectionArmed = waitUntilNormalLine(&lastDirection);
+    if (intersectionArmed)
+        stabilizeOnCenterLine(&lastDirection);
 
     while (!stopButton())
     {
@@ -918,6 +975,8 @@ static int runReturnNavigation(void)
             executeReturnMove(returnPath[returnIndex]);
             returnIndex++;
             intersectionArmed = waitUntilNormalLine(&lastDirection);
+            if (intersectionArmed)
+                stabilizeOnCenterLine(&lastDirection);
             rearmNormalTicks = 0;
             leds(LED_EXPLORING | LED_TARGET_FOUND);
         }
@@ -1059,6 +1118,8 @@ int main(void)
                 lastDirection = 1;
                 clearResult = waitUntilNormalLine(&lastDirection);
                 driveForwardTicks(5);
+                if (clearResult)
+                    stabilizeOnCenterLine(&lastDirection);
                 intersectionArmed = clearResult;
                 rearmNormalTicks = 0;
                 junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
@@ -1102,7 +1163,7 @@ int main(void)
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
-                        driveBackwardTicks(clamp((lineWidthTicks + 1) / 2, 0, TARGET_BACKUP_MAX_TICKS));
+                        driveBackwardTicks(TARGET_STOP_BACKUP_TICKS);
                         confirmTarget(junctionSensors, lineWidthTicks, "at intersection");
                         break;
                     }
@@ -1139,6 +1200,8 @@ int main(void)
                             lastDirection = 1;
 
                         clearResult = waitUntilNormalLine(&lastDirection);
+                        if (clearResult)
+                            stabilizeOnCenterLine(&lastDirection);
                         intersectionArmed = clearResult;
                         rearmNormalTicks = 0;
                         junctionCooldownTicks = JUNCTION_REARM_COOLDOWN_TICKS;
