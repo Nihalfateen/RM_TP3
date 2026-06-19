@@ -43,6 +43,7 @@
 #define LOST_LINE_DEAD_END_TICKS 16
 #define DEAD_END_REACQUIRE_MAX_TICKS 35
 #define DEAD_END_REACQUIRE_HITS 2
+#define TARGET_RETURN_PAUSE_TICKS 150
 /* FIX BUG-05: reduced from 850 to 300 mm. 850 caused the robot to stop
    ~60 cm before the real origin. 300 mm gives encoder-drift tolerance
    without stopping a full tile early. */
@@ -1220,24 +1221,17 @@ static int runReturnNavigation(void)
     return completed;
 }
 
-/* FIX BUG-02: waitForReturnStart() now waits for a full press-then-release
-   cycle so only one deliberate button press is needed. The original version
-   required two presses because the debounce release loop was missing. */
-static int waitForReturnStart(void)
+static int pauseBeforeAutoReturn(void)
 {
+    int ticks;
+
     setVel2(0, 0);
     leds(LED_TARGET_FOUND);
 
-    printf("Target reached; press start for return or stop to reset\n");
+    printf("Target reached; auto return in 3 seconds\n");
 
-    while (startButton() && !stopButton())
-        waitTick20ms(); /* wait for any held press to be released */
-
-    while (!startButton() && !stopButton())
-        waitTick20ms(); /* wait for fresh deliberate press */
-
-    while (startButton() && !stopButton())
-        waitTick20ms(); /* wait for release (debounce) */
+    for (ticks = 0; ticks < TARGET_RETURN_PAUSE_TICKS && !stopButton(); ticks++)
+        waitTick20ms();
 
     return !stopButton();
 }
@@ -1483,7 +1477,7 @@ int main(void)
 
         if (targetFound && mode == MODE_TARGET_FOUND)
         {
-            if (waitForReturnStart())
+            if (pauseBeforeAutoReturn())
             {
                 mode = MODE_RETURN;
                 if (runReturnNavigation())
