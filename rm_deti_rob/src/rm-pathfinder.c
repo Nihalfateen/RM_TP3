@@ -50,7 +50,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v43-deadend-reacquire"
+#define CODE_VERSION "probe-target-v44-snapshot-decision"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -486,6 +486,20 @@ static int isIntersectionCandidate(unsigned int sensors)
         return 1;
 
     return 0;
+}
+
+static char chooseExplorationMoveFromSensors(unsigned int sensors)
+{
+    sensors &= SENSOR_MASK;
+
+    if (hasLeftPath(sensors))
+        return 'L';
+    if (hasForwardPath(sensors))
+        return 'S';
+    if (hasRightPath(sensors))
+        return 'R';
+
+    return 'B';
 }
 
 /* measureLineWidthTicks() — forward scan with full-mask counter.
@@ -1395,10 +1409,27 @@ int main(void)
 
                     if (!stopButton())
                     {
-                        if (!activeProbeExplorationMove(&chosenMove, &lastDirection))
+                        chosenMove = chooseExplorationMoveFromSensors(junctionSensors);
+                        printf("Decision sensors=");
+                        printInt(junctionSensors, 2 | 5 << 16);
+                        printf(" move=%c\n", chosenMove);
+
+                        lastProbeEndedAtIntersection = 0;
+
+                        if (chosenMove == 'B')
+                        {
+                            printf("Decision fallback to active probe\n");
+                            if (!activeProbeExplorationMove(&chosenMove, &lastDirection))
+                            {
+                                setVel2(0, 0);
+                                printf("Active probing failed; stopping\n");
+                                break;
+                            }
+                        }
+                        else if (!moveIntoBranch(chosenMove))
                         {
                             setVel2(0, 0);
-                            printf("Active probing failed; stopping\n");
+                            printf("Exploration move %c failed; stopping\n", chosenMove);
                             break;
                         }
 
@@ -1409,6 +1440,8 @@ int main(void)
                             printf("[ERROR] Path memory overflow - map too large\n");
                             break;
                         }
+                        afterDeadEndBacktrack = 0;
+                        lastDeadEndEntryMove = '\0';
 
                         if (chosenMove == 'L')
                             lastDirection = -1;
