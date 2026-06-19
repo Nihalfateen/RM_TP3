@@ -22,7 +22,7 @@
 /* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
    Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
 #define TARGET_FULL_MASK_MIN_TICKS 5
-#define TARGET_BACKUP_MAX_TICKS 6
+#define TARGET_BACKUP_MAX_TICKS 20
 #define LINE_WIDTH_SCAN_SPEED 15
 #define INTERSECTION_CLEAR_TICKS 8
 #define INTERSECTION_CLEAR_MAX_TICKS 100
@@ -38,7 +38,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v20-threshold-fix"
+#define CODE_VERSION "probe-target-v21-target-stop-center"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -390,22 +390,6 @@ static int isNormalLine(unsigned int sensors);
 static int isIntersectionCandidate(unsigned int sensors);
 static int waitUntilNormalLine(int *lastDirection);
 
-static int hasReturnIntersection(unsigned int sensors)
-{
-    int branches = 0;
-
-    sensors &= SENSOR_MASK;
-
-    if (hasLeftPath(sensors))
-        branches++;
-    if (hasForwardPath(sensors))
-        branches++;
-    if (hasRightPath(sensors))
-        branches++;
-
-    return branches >= 2;
-}
-
 static int isReturnIntersectionCandidate(unsigned int sensors)
 {
     sensors &= SENSOR_MASK;
@@ -499,8 +483,9 @@ static char chooseExplorationMove(unsigned int sensors)
  *   widthTicks    = total ticks isLineWidthReading() stays true
  *   fullMaskTicks = ticks where all 5 sensors fired (11111)
  *
- * Caller uses: widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
- *           OR lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5)
+ * Stop the scan as soon as either target threshold is reached. The target is
+ * a transverse block, so continuing to measure the full width can push the
+ * robot past the marker before it enters MODE_TARGET_FOUND.
  *
  * Both thresholds are well above normal intersection noise (max 6/2).
  */
@@ -529,6 +514,9 @@ static int measureLineWidthTicks(unsigned int firstSensors)
 
         waitTick20ms();
         sensors = readLineSensors(0) & SENSOR_MASK;
+
+        if (widthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
+            break;
     }
     setVel2(0, 0);
 
@@ -542,6 +530,7 @@ static int measureLineWidthTicks(unsigned int firstSensors)
 }
 
 static void printCurrentPose(char *label);
+static void printSignedInt(int value);
 static void driveBackwardTicks(int ticks);
 
 static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
@@ -550,7 +539,7 @@ static void confirmTarget(unsigned int sensors, int widthTicks, char *source)
     leds(LED_TARGET_FOUND);
 
     printf("Target confirmed ");
-    printf(source);
+    printf("%s", source);
     printf(" sensors=");
     printInt(sensors & SENSOR_MASK, 2 | 5 << 16);
     printf(" width=");
@@ -596,14 +585,27 @@ static void printCurrentPose(char *label)
     double theta;
 
     getRobotPos(&x, &y, &theta);
-    printf(label);
+    printf("%s", label);
     printf(" x=");
-    printInt((int)x, 10);
+    printSignedInt((int)x);
     printf(" y=");
-    printInt((int)y, 10);
+    printSignedInt((int)y);
     printf(" theta=");
-    printInt((int)(theta * 1000.0), 10);
+    printSignedInt((int)(theta * 1000.0));
     printf("mrad\n");
+}
+
+static void printSignedInt(int value)
+{
+    if (value < 0)
+    {
+        printf("-");
+        printInt((unsigned int)(-value), 10);
+    }
+    else
+    {
+        printInt((unsigned int)value, 10);
+    }
 }
 
 static int isNearStartPose(void)
@@ -1073,7 +1075,7 @@ int main(void)
                     {
                         targetFound = 1;
                         mode = MODE_TARGET_FOUND;
-                        driveBackwardTicks(clamp(lineWidthTicks / 4, 0, TARGET_BACKUP_MAX_TICKS));
+                        driveBackwardTicks(clamp((lineWidthTicks + 1) / 2, 0, TARGET_BACKUP_MAX_TICKS));
                         confirmTarget(junctionSensors, lineWidthTicks, "at intersection");
                         break;
                     }
