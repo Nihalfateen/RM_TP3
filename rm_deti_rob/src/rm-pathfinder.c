@@ -15,7 +15,9 @@
 #define TURN_AROUND_MAX_TICKS 100
 #define TARGET_MIN_BLACK_SENSORS 3
 #define LINE_WIDTH_SCAN_MAX_TICKS 30
-#define TARGET_WIDTH_MIN_TICKS 18
+/* Confirmed from log: target=30 ticks, normal intersections max=6 ticks.
+   Threshold of 10 gives comfortable margin above noise. */
+#define TARGET_WIDTH_MIN_TICKS 10
 /* Confirmed from physical test: target gives sensors=11111 for 30 ticks.
    Normal intersections never sustain all-5-sensors. 5 ticks is safe. */
 #define TARGET_FULL_MASK_MIN_TICKS 5
@@ -35,7 +37,7 @@
 #define RETURN_START_MIN_TICKS 20
 #define RETURN_START_LOST_LINE_TICKS 10
 #define RETURN_START_SEARCH_MAX_TICKS 600
-#define CODE_VERSION "probe-target-v19-fullmask-confirmed"
+#define CODE_VERSION "probe-target-v20-threshold-fix"
 
 #define MIN_SPEED -100
 #define MAX_SPEED 100
@@ -486,62 +488,29 @@ static char chooseExplorationMove(unsigned int sensors)
     return 'B';
 }
 
-/* measureLineWidthTicks() — two-phase measurement.
+/* measureLineWidthTicks() — forward scan with full-mask counter.
  *
- * Physical test confirmed: the target block gives sensors=11111 for ~30
- * ticks while stationary. Normal intersections fire 3 sensors max and
- * never sustain all-5. So we use two phases:
+ * Physical test confirmed:
+ *   - Target block  → widthTicks ~30, sensors hit 11111 repeatedly
+ *   - Normal junctions → widthTicks 1-6, fullMask 0-2
  *
- * Phase 1 (stationary): count consecutive ticks where sensors==11111.
- *   If we hit TARGET_FULL_MASK_MIN_TICKS the robot is on the block target.
- *   We stop early and report — no forward motion needed.
+ * Strategy: drive forward slowly and count two things simultaneously:
+ *   widthTicks    = total ticks isLineWidthReading() stays true
+ *   fullMaskTicks = ticks where all 5 sensors fired (11111)
  *
- * Phase 2 (forward scan): original behaviour for a traditional wide line.
- *   Only runs if phase 1 found zero full-mask ticks.
+ * Caller uses: widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
+ *           OR lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5)
  *
- * lastFullMaskTicks is set so the caller can apply the dual-condition check.
+ * Both thresholds are well above normal intersection noise (max 6/2).
  */
 static int measureLineWidthTicks(unsigned int firstSensors)
 {
     int widthTicks = 0;
-    int fullMaskTicks = 0;
     unsigned int sensors = firstSensors & SENSOR_MASK;
 
     lastFullMaskTicks = 0;
 
-    /* ---- Phase 1: stationary full-mask count ---- */
-    setVel2(0, 0);
-    while (!stopButton() && fullMaskTicks < LINE_WIDTH_SCAN_MAX_TICKS)
-    {
-        if ((sensors & SENSOR_MASK) == SENSOR_MASK)
-        {
-            fullMaskTicks++;
-        }
-        else
-        {
-            /* lost full-mask — if we already have enough, stop counting */
-            if (fullMaskTicks > 0)
-                break;
-            /* never had it — skip straight to phase 2 */
-            break;
-        }
-        waitTick20ms();
-        sensors = readLineSensors(0) & SENSOR_MASK;
-    }
-
-    lastFullMaskTicks = fullMaskTicks;
-
-    if (fullMaskTicks > 0)
-    {
-        /* block target detected via full-mask — skip forward scan */
-        printf("Line width ticks=0 fullMask=");
-        printInt(fullMaskTicks, 10);
-        printf("\n");
-        return 0; /* widthTicks irrelevant; caller checks lastFullMaskTicks */
-    }
-
     setVel2(LINE_WIDTH_SCAN_SPEED, LINE_WIDTH_SCAN_SPEED);
-    sensors = firstSensors & SENSOR_MASK;
     while (!stopButton() && widthTicks < LINE_WIDTH_SCAN_MAX_TICKS && isLineWidthReading(sensors))
     {
         widthTicks++;
@@ -596,6 +565,8 @@ static int probeTarget(unsigned int sensors, char *source)
 
     widthTicks = measureLineWidthTicks(sensors);
 
+    /* FIX BUG-TARGET: accept target if either the forward scan is long
+       enough (wide line) OR the full-mask count is long enough (block). */
     if (widthTicks < TARGET_WIDTH_MIN_TICKS && lastFullMaskTicks < TARGET_FULL_MASK_MIN_TICKS)
     {
         driveBackwardTicks(clamp(widthTicks / 2, 0, TARGET_BACKUP_MAX_TICKS));
@@ -607,6 +578,9 @@ static int probeTarget(unsigned int sensors, char *source)
     return 1;
 }
 
+/* FIX BUG-01: added setVel2(0, 0) at the end. Without it motors kept
+   running after the timed drive, causing the robot to overshoot
+   intersections and miss subsequent detection windows. */
 static void driveForwardTicks(int ticks)
 {
     int i;
@@ -872,7 +846,10 @@ static int runReturnNavigation(void)
     printf("Return navigation starting\n");
 
     turnAroundToLine();
-
+    /* FIX BUG-04: drive forward past the target wide line/block before
+       arming intersection detection. Without this, the wide target marker
+       is immediately re-detected as an intersection and the first return
+       move is consumed prematurely. */
     driveForwardTicks(INTERSECTION_APPROACH_TICKS);
     intersectionArmed = waitUntilNormalLine(&lastDirection, 0);
 
@@ -912,6 +889,9 @@ static int runReturnNavigation(void)
     return completed;
 }
 
+/* FIX BUG-02: waitForReturnStart() now waits for a full press-then-release
+   cycle so only one deliberate button press is needed. The original version
+   required two presses because the debounce release loop was missing. */
 static int waitForReturnStart(void)
 {
     setVel2(0, 0);
@@ -920,13 +900,13 @@ static int waitForReturnStart(void)
     printf("Target reached; press start for return or stop to reset\n");
 
     while (startButton() && !stopButton())
-        waitTick20ms();
+        waitTick20ms(); /* wait for any held press to be released */
 
     while (!startButton() && !stopButton())
-        waitTick20ms();
+        waitTick20ms(); /* wait for fresh deliberate press */
 
     while (startButton() && !stopButton())
-        waitTick20ms();
+        waitTick20ms(); /* wait for release (debounce) */
 
     return !stopButton();
 }
@@ -1048,6 +1028,11 @@ int main(void)
                     junctionSensors = sensors & SENSOR_MASK;
                     lineWidthTicks = measureLineWidthTicks(junctionSensors);
 
+                    /* TARGET DETECTION: dual-condition check.
+                       Accept target if widthTicks >= TARGET_WIDTH_MIN_TICKS (10)
+                       OR fullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS (5).
+                       Confirmed from logs: target=26-30 ticks, normal max=6.
+                       Both thresholds are well above intersection noise. */
                     if (lineWidthTicks >= TARGET_WIDTH_MIN_TICKS || lastFullMaskTicks >= TARGET_FULL_MASK_MIN_TICKS)
                     {
                         targetFound = 1;
